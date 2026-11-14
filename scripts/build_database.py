@@ -30,6 +30,7 @@ DATA CREDIT:
     Data is (c) NHL, used here for personal, non-commercial purposes.
 """
 
+import re
 import sqlite3
 import sys
 import warnings
@@ -80,6 +81,16 @@ def build_team_games():
         return None
     team_games = pd.concat(parts, ignore_index=True).rename(columns=KEY_RENAMES)
     team_games["team_id"] = team_games["team_id"].astype(int)
+
+    # The NHL leaves the goals-by-strength cells EMPTY when a team scored (or allowed) none in that
+    # situation, instead of writing 0 (about 7% of team-games: the shutouts). In seasons where that
+    # report has numbers at all, an empty cell means zero goals. (Check 4 below proves it: with this
+    # fix the game-by-game 5v5 goals add up to the NHL's season totals for every team.)
+    strength_columns = [c for c in team_games.columns
+                        if re.match(r"goals(For|Against)(\dOn\d|EmptyNet|ExtraAttacker|PenaltyShots)$", c)]
+    for column in strength_columns:
+        season_has_numbers = team_games.groupby("season_id")[column].transform(lambda s: s.notna().any())
+        team_games.loc[season_has_numbers & team_games[column].isna(), column] = 0
     return team_games.sort_values(["season_id", "game_date", "game_id", "team_id"]).reset_index(drop=True)
 
 
@@ -139,6 +150,22 @@ def run_checks(team_games, games):
     print("\nCheck 3: one game per day shows up for every team at most once")
     dupes = team_games.duplicated(["season_id", "game_type", "team_id", "game_date"]).sum()
     print(f"  {dupes} team-days with two games" + ("" if dupes == 0 else " (possible doubleheader or data error)"))
+
+    print("\nCheck 4: game-by-game 5v5 goals add up to the NHL's season totals")
+    for label, mine, season_file in [("5v5 goals for", "goalsFor5On5", "goalsforbystrength_regular"),
+                                     ("5v5 goals against", "goalsAgainst5On5", "goalsagainstbystrength_regular")]:
+        theirs = read(DATA / "nhl" / "team_season" / f"{season_file}.csv")
+        if theirs is None or mine not in theirs.columns:
+            continue
+        theirs = theirs[theirs["teamId"].notna() & theirs[mine].notna()].rename(
+            columns={"seasonId": "season_id", "teamId": "team_id", mine: "season_total"})
+        theirs["team_id"] = theirs["team_id"].astype(int)
+        mine_sum = (team_games[team_games["game_type"] == 2].groupby(["season_id", "team_id"])[mine]
+                    .sum().reset_index())
+        both = theirs.merge(mine_sum, on=["season_id", "team_id"])
+        both = both[both["season_id"] != both["season_id"].max()]
+        ok = int((both["season_total"] == both[mine]).sum())
+        print(f"  {label:<18} {ok} of {len(both)} finished team-seasons match")
 
 
 def main():

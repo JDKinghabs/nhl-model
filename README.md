@@ -51,6 +51,13 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    The workbook is `outputs/checkpoint_standings.xlsx`: start with its "First look" sheet.
    `reference/trade_deadlines.csv` and `reference/franchises.csv` are small hand-checked lists you can
    edit in Excel. Some deadline dates are marked "from memory - please check".
+5. Test the popular stats (plus/minus, PDO, Corsi, hits, shooting %, save %, power play, penalty kill):
+   does each one explain results, repeat from one part of the season to the next, and help predict
+   the rest of the season beyond the record?
+   ```
+   python scripts/build_popular_stats_check.py
+   ```
+   The workbook is `outputs/popular_stats_check.xlsx`: start with its "Verdicts" sheet.
 
 ## Data sources and credits
 
