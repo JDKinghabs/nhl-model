@@ -58,6 +58,13 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    python scripts/build_popular_stats_check.py
    ```
    The workbook is `outputs/popular_stats_check.xlsx`: start with its "Verdicts" sheet.
+6. Build the contender-fit score (version 1, NHL stats only) and test it honestly: does it pick the
+   real conference finalists better than simply ranking by points %? It also shows how champions
+   looked on each stat, a "top 5 in K factors" rule test, and a current-season ranking:
+   ```
+   python scripts/build_contender_fit.py
+   ```
+   The workbook is `outputs/contender_fit.xlsx`: start with its "Verdict" sheet.
 
 ## Data sources and credits
 
