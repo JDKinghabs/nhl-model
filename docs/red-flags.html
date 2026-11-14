@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Red flags - NHL Model</title>
+<meta name="description" content="Independent hockey analytics: who is really good, who is likely to miss the playoffs, and how teams change over a season.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏒</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="index.html">NHL Model</a>
+    <nav><a href="index.html">Home</a><a href="contender-fit.html">Contender fit</a><a href="studies.html" aria-current="page">Studies</a><a href="about.html">About</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+<h1>Red flags</h1>
+<p class="lead">Being in a playoff spot is not the same as being safe. Do warning signs make a team that is "in" more likely to miss?</p>
+<p class="note">Six warning signs, checked on teams that were in a playoff spot at Thanksgiving, Jan 1 or the trade deadline in 15 past seasons
+(2009-10 on). A flag is a reason to look closer, not a prediction. Terms such as cushion, PDO and AUC are explained on the <a href="about.html">About</a> page.</p>
+
+<h2>Right now <span class="note">&middot; teams in a playoff spot, games through Friday, November 13</span></h2>
+<p class="note">Sorted by number of flags, then by how thin the cushion is. Early in a season (about 20 games) flags are noisy.</p>
+
+<div class="chips" data-filter-group="flags-table" role="group" aria-label="Filter teams">
+  <button type="button" data-filter="all" aria-pressed="true">League</button>
+  <button type="button" data-filter="Eastern" aria-pressed="false">Eastern</button>
+  <button type="button" data-filter="Western" aria-pressed="false">Western</button>
+</div>
+<div class="table-wrap">
+<table class="sortable" id="flags-table">
+<thead><tr><th class="left" data-sort="text" data-first="ascending" title="Team" scope="col"><button type="button">Team</button></th><th class="" data-sort="num" title="Number of warning signs" scope="col"><button type="button">Flags</button></th><th class="" data-sort="num" title="Points % above the weakest team that is in a playoff spot" scope="col"><button type="button">Cushion</button></th><th class="" data-sort="num" title="Points percentage" scope="col"><button type="button">P%</button></th><th class="" data-sort="num" title="Games played" scope="col"><button type="button">GP</button></th><th class="" data-sort="text" title="Points won in the last 10 games" scope="col"><button type="button">Last 10</button></th></tr></thead>
+<tbody>
+<tr data-conf="Eastern"><td class="who left" data-v="Ottawa Senators"><strong>Ottawa Senators</strong><span class="why">Running hot (PDO); Weak special teams; Penalty trouble</span></td><td data-v="3.0">3</td><td data-v="0.055">+0.055</td><td data-v="0.65">.650</td><td data-v="20.0">20</td><td data-v="12 of 20">12 of 20</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Montréal Canadiens"><strong>Montréal Canadiens</strong><span class="why">Running hot (PDO); Weak special teams; Penalty trouble</span></td><td data-v="3.0">3</td><td data-v="0.142">+0.142</td><td data-v="0.737">.737</td><td data-v="19.0">19</td><td data-v="18 of 20">18 of 20</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Boston Bruins"><strong>Boston Bruins</strong><span class="why">Running hot (PDO); Penalty trouble</span></td><td data-v="2.0">2</td><td data-v="0.115">+0.115</td><td data-v="0.711">.711</td><td data-v="19.0">19</td><td data-v="13 of 20">13 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Edmonton Oilers"><strong>Edmonton Oilers</strong><span class="why">Running hot (PDO); Weak shot share (Corsi)</span></td><td data-v="2.0">2</td><td data-v="0.225">+0.225</td><td data-v="0.775">.775</td><td data-v="20.0">20</td><td data-v="14 of 20">14 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Utah Mammoth"><strong>Utah Mammoth</strong><span class="why">Cold lately</span></td><td data-v="1.0">1</td><td data-v="0.0">+0.000</td><td data-v="0.55">.550</td><td data-v="20.0">20</td><td data-v="8 of 20">8 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Anaheim Ducks"><strong>Anaheim Ducks</strong><span class="why">Penalty trouble</span></td><td data-v="1.0">1</td><td data-v="0.003">+0.003</td><td data-v="0.553">.553</td><td data-v="19.0">19</td><td data-v="13 of 20">13 of 20</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Florida Panthers"><strong>Florida Panthers</strong><span class="why">Penalty trouble</span></td><td data-v="1.0">1</td><td data-v="0.005">+0.005</td><td data-v="0.6">.600</td><td data-v="20.0">20</td><td data-v="12 of 20">12 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Dallas Stars"><strong>Dallas Stars</strong><span class="why">Penalty trouble</span></td><td data-v="1.0">1</td><td data-v="0.061">+0.061</td><td data-v="0.611">.611</td><td data-v="18.0">18</td><td data-v="13 of 20">13 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Colorado Avalanche"><strong>Colorado Avalanche</strong><span class="why">Running hot (PDO)</span></td><td data-v="1.0">1</td><td data-v="0.075">+0.075</td><td data-v="0.625">.625</td><td data-v="20.0">20</td><td data-v="14 of 20">14 of 20</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="New Jersey Devils"><strong>New Jersey Devils</strong><span class="why">Weak special teams</span></td><td data-v="1.0">1</td><td data-v="0.105">+0.105</td><td data-v="0.7">.700</td><td data-v="20.0">20</td><td data-v="16 of 20">16 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Nashville Predators"><strong>Nashville Predators</strong><span class="why">Weak shot share (Corsi)</span></td><td data-v="1.0">1</td><td data-v="0.125">+0.125</td><td data-v="0.675">.675</td><td data-v="20.0">20</td><td data-v="17 of 20">17 of 20</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Tampa Bay Lightning"><strong>Tampa Bay Lightning</strong><span class="why">Running hot (PDO)</span></td><td data-v="1.0">1</td><td data-v="0.142">+0.142</td><td data-v="0.737">.737</td><td data-v="19.0">19</td><td data-v="14 of 20">14 of 20</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Carolina Hurricanes"><strong>Carolina Hurricanes</strong><span class="why">Running hot (PDO)</span></td><td data-v="1.0">1</td><td data-v="0.205">+0.205</td><td data-v="0.8">.800</td><td data-v="20.0">20</td><td data-v="17 of 20">17 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Minnesota Wild"><strong>Minnesota Wild</strong><span class="why">Running hot (PDO)</span></td><td data-v="1.0">1</td><td data-v="0.212">+0.212</td><td data-v="0.762">.762</td><td data-v="21.0">21</td><td data-v="18 of 20">18 of 20</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="New York Rangers"><strong>New York Rangers</strong><span class="why">None</span></td><td data-v="0.0">0</td><td data-v="0.0">+0.000</td><td data-v="0.595">.595</td><td data-v="21.0">21</td><td data-v="10 of 20">10 of 20</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Vegas Golden Knights"><strong>Vegas Golden Knights</strong><span class="why">None</span></td><td data-v="0.0">0</td><td data-v="0.14">+0.140</td><td data-v="0.69">.690</td><td data-v="21.0">21</td><td data-v="13 of 20">13 of 20</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>What we found</h2>
+<dl class='verdict'><dt>Base rate</dt><dd>Of the teams in a spot at Thanksgiving, 24% missed; at Jan 1, 20%; at the trade deadline, 10%.</dd><dt>Flags that matter</dt><dd>Most consistent (flagged teams missed more than equally safe teams at all three checkpoints, clearly so at one or more): Weak shot share (Corsi), Record flatters goals. Hints (small samples): Running hot (PDO), Weak special teams. No clear effect: Penalty trouble, Cold lately. With 18 flag-and-checkpoint tests, a couple of results this strong can happen by chance, so read them as &#x27;worth a look&#x27;, not proof.</dd><dt>Stacking</dt><dd>Thanksgiving: 9 of 15 teams with 3+ flags missed (60%) against 49 of 225 with 0-2 flags (22%); Jan 1: 8 of 16 teams with 3+ flags missed (50%) against 41 of 224 with 0-2 flags (18%); Trade deadline: 3 of 8 teams with 3+ flags missed (38%) against 21 of 232 with 0-2 flags (9%). The 3-or-more group is small (8-16 teams) and is one of four groups, so treat the gap as a hint.</dd><dt>Honest test</dt><dd>Adding the number of flags to the cushion changes the hold-out AUC by +0.012 on average (margin about +/-0.029): within the noise, so the flags do not clearly improve on simply asking how close to the line the team was.</dd><dt>How to use it</dt><dd>Treat flags as reasons to look closer, not predictions. They are most useful for explaining WHY a team&#x27;s spot may be less safe than the standings suggest. Early in a season (about 20 games) the flags are noisy.</dd></dl>
+
+<h2>The six flags, one by one</h2>
+<p>"Missed" is how many flagged teams missed the playoffs after all, against equally safe teams without the flag. "Most consistent"
+means flagged teams missed more than equally safe teams at all three checkpoints.</p>
+<div class="table-wrap"><table><thead><tr><th class="left" scope="col">Flag</th><th class="left" scope="col">Verdict across 3 checkpoints</th><th class="" scope="col">Thanksgiving: flagged</th><th class="" scope="col">Missed: flagged vs not</th><th class="" scope="col">Jan 1: flagged</th><th class="" scope="col">Missed: flagged vs not</th></tr></thead><tbody><tr><td class="who left">Running hot (PDO)</td><td class="who left">Hint</td><td class="">104 teams</td><td class="">23% vs 25%</td><td class="">103 teams</td><td class="">16% vs 24%</td></tr><tr><td class="who left">Weak shot share (Corsi)</td><td class="who left">Most consistent</td><td class="">30 teams</td><td class="">50% vs 20%</td><td class="">33 teams</td><td class="">39% vs 17%</td></tr><tr><td class="who left">Record flatters goals</td><td class="who left">Most consistent</td><td class="">23 teams</td><td class="">48% vs 22%</td><td class="">14 teams</td><td class="">29% vs 20%</td></tr><tr><td class="who left">Weak special teams</td><td class="who left">Hint</td><td class="">36 teams</td><td class="">36% vs 22%</td><td class="">26 teams</td><td class="">38% vs 18%</td></tr><tr><td class="who left">Penalty trouble</td><td class="who left">No clear effect</td><td class="">57 teams</td><td class="">26% vs 24%</td><td class="">61 teams</td><td class="">21% vs 20%</td></tr><tr><td class="who left">Cold lately</td><td class="who left">No clear effect</td><td class="">9 teams</td><td class="">33% vs 24%</td><td class="">23 teams</td><td class="">26% vs 20%</td></tr></tbody></table></div>
+
+<h2>Do flags stack?</h2>
+<p>How often teams in a playoff spot missed, by how many flags they had.</p>
+<div class="table-wrap"><table><thead><tr><th class="left" scope="col">Flags a team had</th><th class="" scope="col">Missed at Thanksgiving</th><th class="" scope="col">Missed at Jan 1</th><th class="" scope="col">Missed at the deadline</th></tr></thead><tbody><tr><td class="who left">0 flags</td><td class="">11 of 68 (16%)</td><td class="">12 of 67 (18%)</td><td class="">7 of 70 (10%)</td></tr><tr><td class="who left">1 flag</td><td class="">23 of 102 (23%)</td><td class="">21 of 104 (20%)</td><td class="">8 of 108 (7%)</td></tr><tr><td class="who left">2 flags</td><td class="">15 of 55 (27%)</td><td class="">8 of 53 (15%)</td><td class="">6 of 54 (11%)</td></tr><tr><td class="who left">3 or more flags</td><td class="">9 of 15 (60%)</td><td class="">8 of 16 (50%)</td><td class="">3 of 8 (38%)</td></tr></tbody></table></div>
+
+<h2>What the flags mean</h2>
+<dl class="glossary"><dt>Running hot (PDO)</dt><dd>Shooting % + save % is in the top quarter of the league: luck that tends to even out.</dd><dt>Weak shot share (Corsi)</dt><dd>Takes a smaller share of the shot attempts than most teams (bottom quarter).</dd><dt>Record flatters goals</dt><dd>Ranks at least 25 percentile points higher on points than on goal difference: wins came in close games.</dd><dt>Weak special teams</dt><dd>Power-play % + penalty-kill % in the bottom quarter of the league.</dd><dt>Penalty trouble</dt><dd>Short-handed more often than almost anyone: top quarter in times short-handed per game.</dd><dt>Cold lately</dt><dd>Points % over the last 10 games in the bottom quarter of the league.</dd></dl>
+
+<h2>How it was tested, and the limits</h2>
+<ul>
+  <li>The six flags and their cut-offs (top or bottom quarter of the league that season) were fixed before looking at results.</li>
+  <li>Each flagged team is compared with teams the same distance above the playoff line, so a flag cannot win just by meaning "barely in".</li>
+  <li>With 6 flags at 3 checkpoints, a couple of strong-looking results can happen by chance, and the groups with 3 or more flags are small.</li>
+  <li>Only team statistics are used: no injuries, trades, schedule or shot quality.</li>
+</ul>
+<p class="note">Method and code are public: <a href="https://github.com/JDKinghabs/nhl-model">github.com/JDKinghabs/nhl-model</a>. Data: &copy; NHL.</p>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>
+    <p>For information and entertainment only. Nothing here is betting or financial advice.</p>
+    <p>Page built Nov 14, 2026 at 3:56 PM ET.</p>
+  </div>
+</footer>
+<script src="site.js"></script>
+</body>
+</html>

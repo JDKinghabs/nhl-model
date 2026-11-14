@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slow starters - NHL Model</title>
+<meta name="description" content="Independent hockey analytics: who is really good, who is likely to miss the playoffs, and how teams change over a season.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏒</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="index.html">NHL Model</a>
+    <nav><a href="index.html">Home</a><a href="contender-fit.html">Contender fit</a><a href="studies.html" aria-current="page">Studies</a><a href="about.html">About</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+<h1>Slow starters</h1>
+<p class="lead">A team out of a playoff spot at Thanksgiving: how often does it recover, what does it take, and is there any sign of which ones will?</p>
+<p class="note">Teams that were out of a playoff spot at Nov 1, Thanksgiving, Jan 1 or the trade deadline in 15 past seasons (2009-10 on).
+A slow start is a reason to check how far behind a team is and what pace it needs, not a prediction. Terms such as cut line and AUC are explained on the <a href="about.html">About</a> page.</p>
+
+<h2>Right now <span class="note">&middot; teams out of a playoff spot, games through Friday, November 13</span></h2>
+<p class="note">"Needs" is the points % the team must earn in its remaining games to reach the typical final cut line. Early in a season the signs are noisy.</p>
+
+<div class="chips" data-filter-group="slow-table" role="group" aria-label="Filter teams">
+  <button type="button" data-filter="all" aria-pressed="true">League</button>
+  <button type="button" data-filter="Eastern" aria-pressed="false">Eastern</button>
+  <button type="button" data-filter="Western" aria-pressed="false">Western</button>
+</div>
+<div class="table-wrap">
+<table class="sortable" id="slow-table">
+<thead><tr><th class="left" data-sort="text" data-first="ascending" title="Team" scope="col"><button type="button">Team</button></th><th class="" data-sort="num" title="Points % needed in the remaining games to reach the typical final cut line" scope="col"><button type="button">Needs</button></th><th class="" data-sort="num" title="Points % compared with the weakest team in a playoff spot (negative = below it)" scope="col"><button type="button">vs line</button></th><th class="" data-sort="num" title="Points percentage" scope="col"><button type="button">P%</button></th><th class="" data-sort="num" title="Games played" scope="col"><button type="button">GP</button></th><th class="" data-sort="num" title="Number of signs of a coming recovery" scope="col"><button type="button">Signs</button></th></tr></thead>
+<tbody>
+<tr data-conf="Western"><td class="who left" data-v="Seattle Kraken"><strong>Seattle Kraken</strong><span class="why">Just out (of teams this far behind at Thanksgiving, 24 of 57 recovered). Stays out of the box</span></td><td data-v="0.578">.578</td><td data-v="0.009">+0.009</td><td data-v="0.559">.559</td><td data-v="17.0">17</td><td data-v="1.0">1</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Washington Capitals"><strong>Washington Capitals</strong><span class="why">Just out (of teams this far behind at Thanksgiving, 24 of 57 recovered). No signs</span></td><td data-v="0.57">.570</td><td data-v="-0.007">-0.007</td><td data-v="0.588">.588</td><td data-v="17.0">17</td><td data-v="0.0">0</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="St. Louis Blues"><strong>St. Louis Blues</strong><span class="why">Just out (of teams this far behind at Thanksgiving, 24 of 57 recovered). Stays out of the box</span></td><td data-v="0.588">.588</td><td data-v="-0.024">-0.024</td><td data-v="0.526">.526</td><td data-v="19.0">19</td><td data-v="1.0">1</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Winnipeg Jets"><strong>Winnipeg Jets</strong><span class="why">Just out (of teams this far behind at Thanksgiving, 24 of 57 recovered). No signs</span></td><td data-v="0.59">.590</td><td data-v="-0.025">-0.025</td><td data-v="0.525">.525</td><td data-v="20.0">20</td><td data-v="0.0">0</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="New York Islanders"><strong>New York Islanders</strong><span class="why">Behind (of teams this far behind at Thanksgiving, 18 of 55 recovered). No signs</span></td><td data-v="0.579">.579</td><td data-v="-0.04">-0.040</td><td data-v="0.556">.556</td><td data-v="18.0">18</td><td data-v="0.0">0</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Buffalo Sabres"><strong>Buffalo Sabres</strong><span class="why">Behind (of teams this far behind at Thanksgiving, 18 of 55 recovered). Running cold (PDO); Strong shot share (Corsi)</span></td><td data-v="0.588">.588</td><td data-v="-0.069">-0.069</td><td data-v="0.526">.526</td><td data-v="19.0">19</td><td data-v="2.0">2</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Calgary Flames"><strong>Calgary Flames</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). Running cold (PDO); Strong special teams</span></td><td data-v="0.612">.612</td><td data-v="-0.103">-0.103</td><td data-v="0.447">.447</td><td data-v="19.0">19</td><td data-v="2.0">2</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="San Jose Sharks"><strong>San Jose Sharks</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). Running cold (PDO)</span></td><td data-v="0.624">.624</td><td data-v="-0.121">-0.121</td><td data-v="0.429">.429</td><td data-v="21.0">21</td><td data-v="1.0">1</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Toronto Maple Leafs"><strong>Toronto Maple Leafs</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). Strong special teams</span></td><td data-v="0.624">.624</td><td data-v="-0.167">-0.167</td><td data-v="0.429">.429</td><td data-v="21.0">21</td><td data-v="1.0">1</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Detroit Red Wings"><strong>Detroit Red Wings</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). No signs</span></td><td data-v="0.622">.622</td><td data-v="-0.17">-0.170</td><td data-v="0.425">.425</td><td data-v="20.0">20</td><td data-v="0.0">0</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Pittsburgh Penguins"><strong>Pittsburgh Penguins</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). Running cold (PDO); Strong shot share (Corsi); Stays out of the box</span></td><td data-v="0.62">.620</td><td data-v="-0.174">-0.174</td><td data-v="0.421">.421</td><td data-v="19.0">19</td><td data-v="3.0">3</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Columbus Blue Jackets"><strong>Columbus Blue Jackets</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). Stays out of the box</span></td><td data-v="0.616">.616</td><td data-v="-0.183">-0.183</td><td data-v="0.412">.412</td><td data-v="17.0">17</td><td data-v="1.0">1</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Los Angeles Kings"><strong>Los Angeles Kings</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). No signs</span></td><td data-v="0.632">.632</td><td data-v="-0.197">-0.197</td><td data-v="0.353">.353</td><td data-v="17.0">17</td><td data-v="0.0">0</td></tr>
+<tr data-conf="Eastern"><td class="who left" data-v="Philadelphia Flyers"><strong>Philadelphia Flyers</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). Running cold (PDO)</span></td><td data-v="0.64">.640</td><td data-v="-0.214">-0.214</td><td data-v="0.381">.381</td><td data-v="21.0">21</td><td data-v="1.0">1</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Chicago Blackhawks"><strong>Chicago Blackhawks</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). Running cold (PDO)</span></td><td data-v="0.66">.660</td><td data-v="-0.261">-0.261</td><td data-v="0.289">.289</td><td data-v="19.0">19</td><td data-v="1.0">1</td></tr>
+<tr data-conf="Western"><td class="who left" data-v="Vancouver Canucks"><strong>Vancouver Canucks</strong><span class="why">Far behind (of teams this far behind at Thanksgiving, 16 of 110 recovered). No signs</span></td><td data-v="0.714">.714</td><td data-v="-0.383">-0.383</td><td data-v="0.167">.167</td><td data-v="21.0">21</td><td data-v="0.0">0</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>What we found</h2>
+<dl class='verdict'><dt>The Thanksgiving claim</dt><dd>Of 222 teams out of a spot at Thanksgiving, 58 (26%) made the playoffs. It depends on how far behind: just out 42% (24 of 57), behind 33% (18 of 55), far behind 14% (16 of 110). So &#x27;rarely recover&#x27; is true for teams well behind and not for teams just out.</dd><dt>What it takes</dt><dd>Pace needed over the rest of the season to reach the typical final cut line (about 0.574 points %): needing under .600: 41% (34 of 83); needing .600 to .650: 20% (23 of 116); needing .650 to .700: 4% (1 of 22); needing .700 or more: 0% (0 of 1).</dd><dt>Signs of recovery</dt><dd>No sign is consistent at all four checkpoints. Hints (small samples): Strong shot share (Corsi), Strong special teams. No clear effect: Running cold (PDO), Goals say better than record, Stays out of the box, Hot lately. With 24 sign-and-checkpoint tests, a few results this strong can happen by chance: read them as &#x27;worth a look&#x27;.</dd><dt>Stacking (Thanksgiving)</dt><dd>0 signs: 19 of 75 (25%); 1 sign: 18 of 75 (24%); 2 signs: 11 of 49 (22%); 3 or more signs: 10 of 23 (43%).</dd><dt>Honest test</dt><dd>Adding the number of signs to the distance behind changes the hold-out AUC by +0.004 on average (margin about +/-0.022): within the noise, so the signs do not clearly improve on simply asking how far behind the team was.</dd><dt>Who recovered</dt><dd>58 teams out of a spot at Thanksgiving made it; 5 of them reached the Cup final, including St. Louis Blues (2018-19) who won the Cup.</dd><dt>How to use it</dt><dd>Treat a slow start as a reason to check HOW far behind the team is and what pace it needs, then look at the signs for whether its record undersells it. Early in a season the signs are noisy.</dd></dl>
+
+<h2>How often teams recover</h2>
+<p>Teams out of a playoff spot at each checkpoint that made the playoffs after all, by how far behind they were.</p>
+<div class="table-wrap"><table><thead><tr><th class="left" scope="col">How far behind</th><th class="" scope="col">Out at Nov 1</th><th class="" scope="col">Out at Thanksgiving</th><th class="" scope="col">Out at Jan 1</th><th class="" scope="col">Out at the deadline</th></tr></thead><tbody><tr><td class="who left">All teams out of a spot</td><td class="">72 of 222 (32%)</td><td class="">58 of 222 (26%)</td><td class="">49 of 222 (22%)</td><td class="">24 of 222 (11%)</td></tr><tr><td class="who left">Just out (within about 5 points)</td><td class="">29 of 56 (52%)</td><td class="">24 of 57 (42%)</td><td class="">30 of 61 (49%)</td><td class="">21 of 68 (31%)</td></tr><tr><td class="who left">Behind (about 5 to 13 points)</td><td class="">24 of 52 (46%)</td><td class="">18 of 55 (33%)</td><td class="">13 of 71 (18%)</td><td class="">3 of 77 (4%)</td></tr><tr><td class="who left">Far behind (more than about 13 points)</td><td class="">19 of 114 (17%)</td><td class="">16 of 110 (15%)</td><td class="">6 of 90 (7%)</td><td class="">0 of 77 (0%)</td></tr></tbody></table></div>
+
+<h2>What it takes</h2>
+<p>The points % a team had to earn over the rest of the season to reach the typical final cut line, and how often teams that needed it recovered.</p>
+<div class="table-wrap"><table><thead><tr><th class="left" scope="col">Points % needed over the rest of the season</th><th class="" scope="col">Recovered, out at Thanksgiving</th><th class="" scope="col">Recovered, out at Jan 1</th></tr></thead><tbody><tr><td class="who left">Needing under .600</td><td class="">34 of 83 (41%)</td><td class="">23 of 43 (53%)</td></tr><tr><td class="who left">Needing .600 to .650</td><td class="">23 of 116 (20%)</td><td class="">20 of 80 (25%)</td></tr><tr><td class="who left">Needing .650 to .700</td><td class="">1 of 22 (5%)</td><td class="">6 of 55 (11%)</td></tr><tr><td class="who left">Needing .700 or more</td><td class="">0 of 1 (0%)</td><td class="">0 of 44 (0%)</td></tr></tbody></table></div>
+
+<h2>Signs of a coming recovery</h2>
+<p>Six signs, fixed in advance as the top or bottom quarter of the league: the mirror image of the <a href="red-flags.html">red flags</a>.
+"Most consistent" would mean teams with the sign recovered more than equally far behind teams at every checkpoint.</p>
+<div class="table-wrap"><table><thead><tr><th class="left" scope="col">Sign of a coming recovery</th><th class="left" scope="col">Verdict across 4 checkpoints</th><th class="left" scope="col">What it means</th></tr></thead><tbody><tr><td class="who left">Running cold (PDO)</td><td class="who left">No clear effect</td><td class="who left">Shooting % + save % is in the bottom quarter of the league: bad luck that tends to turn.</td></tr><tr><td class="who left">Strong shot share (Corsi)</td><td class="who left">Hint</td><td class="who left">Takes a bigger share of the shot attempts than most teams (top quarter).</td></tr><tr><td class="who left">Goals say better than record</td><td class="who left">No clear effect</td><td class="who left">Ranks at least 25 percentile points higher on goal difference than on points.</td></tr><tr><td class="who left">Strong special teams</td><td class="who left">Hint</td><td class="who left">Power-play % + penalty-kill % in the top quarter of the league.</td></tr><tr><td class="who left">Stays out of the box</td><td class="who left">No clear effect</td><td class="who left">Among the league&#x27;s least short-handed teams (bottom quarter in times short-handed per game).</td></tr><tr><td class="who left">Hot lately</td><td class="who left">No clear effect</td><td class="who left">Points % over the last 10 games in the top quarter of the league.</td></tr></tbody></table></div>
+
+<h2>Slow starters that reached the Cup final</h2>
+<p>Of the 58 teams out of a spot at Thanksgiving that recovered, these went all the way to the final.</p>
+<div class="table-wrap"><table><thead><tr><th class="left" scope="col">Season</th><th class="left" scope="col">Team</th><th class="" scope="col">Points % at Thanksgiving</th><th class="" scope="col">Points % needed the rest of the way</th><th class="left" scope="col">How the season ended</th></tr></thead><tbody><tr><td class="who left">2011-12</td><td class="who left">New Jersey Devils</td><td class="">.575</td><td class="">.574</td><td class="who left">Lost Cup final</td></tr><tr><td class="who left">2018-19</td><td class="who left">St. Louis Blues</td><td class="">.425</td><td class="">.622</td><td class="who left">Won Cup</td></tr><tr><td class="who left">2022-23</td><td class="who left">Florida Panthers</td><td class="">.550</td><td class="">.582</td><td class="who left">Lost Cup final</td></tr><tr><td class="who left">2023-24</td><td class="who left">Edmonton Oilers</td><td class="">.306</td><td class="">.649</td><td class="who left">Lost Cup final</td></tr><tr><td class="who left">2024-25</td><td class="who left">Edmonton Oilers</td><td class="">.545</td><td class="">.584</td><td class="who left">Lost Cup final</td></tr></tbody></table></div>
+
+<h2>How it was tested, and the limits</h2>
+<ul>
+  <li>Each team with a sign is compared with teams the same distance behind, so a sign cannot win just by meaning "only slightly behind".</li>
+  <li>With 6 signs at 4 checkpoints, a few results will look interesting by chance. The groups are small (about 220 teams per checkpoint, 50 to 70 recoveries).</li>
+  <li>Team statistics only: no injuries, trades, schedule or goalie changes.</li>
+</ul>
+<p class="note">Method and code are public: <a href="https://github.com/JDKinghabs/nhl-model">github.com/JDKinghabs/nhl-model</a>. Data: &copy; NHL.</p>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>
+    <p>For information and entertainment only. Nothing here is betting or financial advice.</p>
+    <p>Page built Nov 14, 2026 at 3:56 PM ET.</p>
+  </div>
+</footer>
+<script src="site.js"></script>
+</body>
+</html>

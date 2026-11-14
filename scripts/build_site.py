@@ -49,10 +49,13 @@ def esc(value):
 # ----------------------------------------------------------------------------
 # The page "frame": the header, menu and footer that every page shares.
 # ----------------------------------------------------------------------------
-def page(title, active, body, built_text):
+def page(title, active, body, built_text, moneypuck=False):
     def link(href, label, key):
         current = ' aria-current="page"' if key == active else ""
         return f'<a href="{href}"{current}>{label}</a>'
+
+    credit = ('\n    <p>Shot-quality data: <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used for non-commercial purposes with credit.</p>'
+              if moneypuck else "")
 
     return f"""<!doctype html>
 <html lang="en">
@@ -68,7 +71,7 @@ def page(title, active, body, built_text):
 <header class="site-header">
   <div class="wrap">
     <a class="brand" href="index.html">{esc(SITE_NAME)}</a>
-    <nav>{link("index.html", "Home", "home")}{link("contender-fit.html", "Contender fit", "contender")}{link("about.html", "About", "about")}</nav>
+    <nav>{link("index.html", "Home", "home")}{link("contender-fit.html", "Contender fit", "contender")}{link("studies.html", "Studies", "studies")}{link("about.html", "About", "about")}</nav>
   </div>
 </header>
 <main class="wrap">
@@ -76,7 +79,7 @@ def page(title, active, body, built_text):
 </main>
 <footer class="site-footer">
   <div class="wrap">
-    <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>
+    <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>{credit}
     <p>For information and entertainment only. Nothing here is betting or financial advice.</p>
     <p>{esc(built_text)}</p>
   </div>
@@ -220,7 +223,7 @@ def home_page(schedule, standings, built_text):
     body = f"""
 <h1>{esc(SITE_NAME)}</h1>
 <p class="lead">{esc(TAGLINE)}</p>
-<p class="note">Tonight's games and the standings. New: <a href="contender-fit.html">Contender fit</a>, how each team's season so far compares with teams that went on to reach the conference finals. More research pages are on the way: see <a href="about.html">About</a>.</p>
+<p class="note">Tonight's games and the standings. Also: <a href="contender-fit.html">Contender fit</a>, how each team's season so far compares with teams that went on to reach the conference finals, and the <a href="studies.html">Studies</a>: red flags, slow starters and goaltending in context. See <a href="about.html">About</a> for what the terms mean.</p>
 {games_section(schedule, standings)}
 {standings_section(standings)}
 """
@@ -241,8 +244,10 @@ def about_page(built_text):
 <h2>What is planned</h2>
 <ul class="roadmap">
   <li><strong><a href="contender-fit.html">Contender fit</a></strong><span class="tag live">Live</span><br><span class="note">How closely each team's profile matches teams that reached the conference finals in past seasons, and why. Version 1 uses NHL team stats only; shot-quality data comes next.</span></li>
-  <li><strong>Red flags</strong><span class="tag">Planned</span><br><span class="note">A simple checklist of warning signs, and how often teams with those signs have missed the playoffs.</span></li>
-  <li><strong>Slow starters</strong><span class="tag">Planned</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
+  <li><strong><a href="red-flags.html">Red flags</a></strong><span class="tag live">Live</span><br><span class="note">A simple checklist of warning signs, and how often teams with those signs have missed the playoffs.</span></li>
+  <li><strong><a href="slow-starters.html">Slow starters</a></strong><span class="tag live">Live</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
+  <li><strong><a href="goaltending.html">Goaltending in context</a></strong><span class="tag live">Live</span><br><span class="note">Whether a goalie is bailing out a weak defense or a strong defense is being let down, and whether a hot playoff goalie can be foreseen.</span></li>
+  <li><strong>Zone time and breakouts</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone and how cleanly it gets out of its own end.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 
@@ -258,9 +263,26 @@ def about_page(built_text):
   <dt>STRK</dt><dd>Current streak: W for wins, L for losses, OT for overtime losses.</dd>
 </dl>
 
+<h2>Terms used on the research pages</h2>
+<dl class="glossary">
+  <dt>Points %</dt><dd>Points won out of points available.</dd>
+  <dt>Corsi</dt><dd>Share of all shot attempts (shots on goal, misses and blocks) a team takes at 5-on-5. A measure of who controls play.</dd>
+  <dt>PDO</dt><dd>Shooting % plus save %. The league average is about 1.000, so a high PDO is usually good luck that tends to even out.</dd>
+  <dt>Expected goals</dt><dd>Each shot gets a probability of being a goal from where it was taken, the shot type and what happened before it. Adding them up measures shot quality.</dd>
+  <dt>GSAx</dt><dd>Goals saved above expected: the expected goals a goalie faced minus the goals he allowed.</dd>
+  <dt>High-danger shot</dt><dd>A shot from the most dangerous area of the ice (the slot), as defined by MoneyPuck.</dd>
+  <dt>Cut line, cushion</dt><dd>The cut line is the weakest team currently in a playoff spot. The cushion is how far above or below it a team is, in points %.</dd>
+  <dt>Percentile</dt><dd>Where a team ranks that season: 100 is the best in the league, 50 is average.</dd>
+  <dt>AUC</dt><dd>How well a ranking puts the teams that did something (such as reaching the conference finals) above the ones that did not. 1.0 is perfect, 0.5 is a coin flip.</dd>
+  <dt>Correlation</dt><dd>A number from -1 to +1 for how closely two things move together. About 0.3 is a modest link and 0.5 a strong one; it is usually worked out on ranks, so each season is compared fairly.</dd>
+  <dt>R-squared</dt><dd>The share of the differences between teams that a forecast explains. 0.25 means a quarter.</dd>
+  <dt>Lift</dt><dd>How much more often something happens to teams that meet a rule than to a random team.</dd>
+  <dt>Hold-out test</dt><dd>A rule is built on all seasons but one and tried on the one it has never seen, then repeated for each season.</dd>
+</dl>
+
 <div class="prose">
 <h2>Data and credits</h2>
-<p>Schedule and standings come from the NHL's public web data, &copy; NHL, used here for personal, non-commercial purposes. That data is unofficial and can change without notice. Other data sources, including <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, will be added to later pages and credited wherever their data is shown.</p>
+<p>Schedule and standings come from the NHL's public web data, &copy; NHL, used here for personal, non-commercial purposes. That data is unofficial and can change without notice. Shot-quality data (expected goals, shots by danger, goals saved above expected) comes from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used for non-commercial purposes with credit, and is credited on every page that uses it.</p>
 <p>No NHL logos are used. This site has no ads and does not sell anything.</p>
 
 <h2>Disclaimer</h2>
@@ -454,6 +476,412 @@ Shot-quality data from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a
 
 
 # ----------------------------------------------------------------------------
+# The research pages: Red flags, Slow starters, Goaltending in context, and the Studies hub.
+# Each one reads the workbook its study wrote (outputs/*.xlsx) and shows the summary only.
+# ----------------------------------------------------------------------------
+RED_FILE = PROJECT_FOLDER / "outputs" / "red_flags.xlsx"
+SLOW_FILE = PROJECT_FOLDER / "outputs" / "slow_starters.xlsx"
+GOAL_FILE = PROJECT_FOLDER / "outputs" / "goaltending_in_context.xlsx"
+
+MONEYPUCK_NOTE = ('Shot-quality data on this page is from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, '
+                  'used here for non-commercial purposes with credit.')
+
+
+def read_sheet(path, name, header=0):
+    return pd.read_excel(path, sheet_name=name, header=header)
+
+
+def read_note(path, sheet="Right now"):
+    return str(pd.read_excel(path, sheet_name=sheet, header=None, nrows=1).iloc[0, 0])
+
+
+def through_text(note):
+    match = re.search(r"games through (\d{4}-\d{2}-\d{2})", note)
+    return nice_date(match.group(1)) if match else "the latest games"
+
+
+def first_sentence(text, limit=330):
+    text = str(text).strip()
+    cut = text.find(". ")
+    sentence = text if cut == -1 else text[:cut + 1]
+    if len(sentence) > limit:
+        sentence = sentence[:limit].rsplit(" ", 1)[0] + "..."
+    return sentence
+
+
+def web_text(text):
+    """The workbook sentences sometimes point at 'the X sheet'. On a web page that means nothing, so drop those sentences."""
+    sentences = re.split(r"(?<=[.!?])\s+", str(text).strip())
+    kept = [s for s in sentences if not re.search(r"\bsheets?\b|\bworkbook\b|\bExcel\b", s)]
+    return " ".join(kept)
+
+
+def verdict_list(verdict, skip=("Question",)):
+    items = []
+    for _, row in verdict.iterrows():
+        key = str(row.iloc[0])
+        if key in skip:
+            continue
+        items.append(f"<dt>{esc(key)}</dt><dd>{esc(web_text(row.iloc[1]))}</dd>")
+    return f"<dl class='verdict'>{''.join(items)}</dl>"
+
+
+def static_table(headers, rows, left=(0,)):
+    """A plain table. headers: list of text. rows: list of lists of already-formatted text. left: columns shown left-aligned."""
+    th = "".join(f'<th class="{"left" if i in left else ""}" scope="col">{esc(h)}</th>' for i, h in enumerate(headers))
+    body = "".join("<tr>" + "".join(f'<td class="{"who left" if i in left else ""}">{esc(v)}</td>' for i, v in enumerate(row)) + "</tr>"
+                   for row in rows)
+    return f'<div class="table-wrap"><table><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>'
+
+
+def team_table(table_id, df, cols, conference, sort_note=True):
+    """
+    A sortable team table with the League / Eastern / Western buttons.
+    cols: list of dicts with  label, get (a function of a row), kind ('num' or 'text'), fmt (function), tip,
+          first ('ascending' or None), sub (optional function giving a small second line, for the team column).
+    """
+    head = []
+    for c in cols:
+        left = " left" if c.get("sub") else ""
+        first = f' data-first="{c["first"]}"' if c.get("first") else ""
+        head.append(f'<th class="{left.strip()}" data-sort="{c["kind"]}"{first} title="{esc(c.get("tip", c["label"]))}" scope="col">'
+                    f'<button type="button">{esc(c["label"])}</button></th>')
+    rows = []
+    for _, r in df.iterrows():
+        cells = []
+        for c in cols:
+            raw = c["get"](r)
+            shown = c["fmt"](raw) if c.get("fmt") else str(raw)
+            if c["kind"] == "num":
+                try:
+                    data_v = "" if pd.isna(raw) else str(float(raw))
+                except (TypeError, ValueError):
+                    data_v = ""
+            else:
+                data_v = esc(raw)
+            if c.get("sub"):
+                cells.append(f'<td class="who left" data-v="{data_v}"><strong>{esc(shown)}</strong><span class="why">{esc(c["sub"](r))}</span></td>')
+            else:
+                cells.append(f'<td data-v="{data_v}">{esc(shown)}</td>')
+        rows.append(f'<tr data-conf="{esc(conference.get(r.get("Team", ""), ""))}">{"".join(cells)}</tr>')
+    return f"""
+<div class="chips" data-filter-group="{table_id}" role="group" aria-label="Filter teams">
+  <button type="button" data-filter="all" aria-pressed="true">League</button>
+  <button type="button" data-filter="Eastern" aria-pressed="false">Eastern</button>
+  <button type="button" data-filter="Western" aria-pressed="false">Western</button>
+</div>
+<div class="table-wrap">
+<table class="sortable" id="{table_id}">
+<thead><tr>{''.join(head)}</tr></thead>
+<tbody>
+{chr(10).join(rows)}
+</tbody>
+</table>
+</div>"""
+
+
+def conference_map(standings):
+    return {row["team_name"]: row["conference"] for _, row in standings.iterrows()}
+
+
+def rate_text(count, total):
+    return f"{int(count)} of {int(total)} ({count / total:.0%})" if total else "-"
+
+
+# ---- Red flags -------------------------------------------------------------
+def red_flags_page(standings, built_text):
+    v = read_sheet(RED_FILE, "Verdict")
+    flags = read_sheet(RED_FILE, "The flags")
+    by_flag = read_sheet(RED_FILE, "Flag by flag")
+    stacking = read_sheet(RED_FILE, "Stacking")
+    right = read_sheet(RED_FILE, "Right now", header=1)
+    note = read_note(RED_FILE)
+
+    flag_rows = []
+    for name in flags["Flag"]:
+        part = by_flag[by_flag["Flag"] == name]
+        row = [name, str(part["Verdict across the 3 checkpoints"].iloc[0])]
+        for cp in ("Thanksgiving", "Jan 1"):
+            p = part[part["Checkpoint"] == cp].iloc[0]
+            row += [f"{int(p['Flagged teams'])} teams", f"{p['Miss rate, flagged']:.0%} vs {p['Miss rate, not flagged']:.0%}"]
+        flag_rows.append(row)
+    flag_table = static_table(["Flag", "Verdict across 3 checkpoints", "Thanksgiving: flagged", "Missed: flagged vs not",
+                               "Jan 1: flagged", "Missed: flagged vs not"], flag_rows, left=(0, 1))
+
+    stack_rows = []
+    for group in ["0 flags", "1 flag", "2 flags", "3 or more flags"]:
+        row = [group]
+        for cp in ("Thanksgiving", "Jan 1", "Trade deadline"):
+            p = stacking[(stacking["Checkpoint"] == cp) & (stacking["Flags"] == group)]
+            row.append(rate_text(p["Missed"].iloc[0], p["Teams"].iloc[0]) if len(p) else "-")
+        stack_rows.append(row)
+    stack_table = static_table(["Flags a team had", "Missed at Thanksgiving", "Missed at Jan 1", "Missed at the deadline"], stack_rows)
+
+    definitions = "".join(f"<dt>{esc(r['Flag'])}</dt><dd>{esc(r['What it means'])}</dd>" for _, r in flags.iterrows())
+    right["Flags"] = right["Flags"].fillna("None")
+    cols = [
+        {"label": "Team", "get": lambda r: r["Team"], "kind": "text", "first": "ascending", "sub": lambda r: r["Flags"]},
+        {"label": "Flags", "get": lambda r: r["Number of flags"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Number of warning signs"},
+        {"label": "Cushion", "get": lambda r: r["Cushion above the cut line"], "kind": "num", "fmt": lambda x: f"{x:+.3f}",
+         "tip": "Points % above the weakest team that is in a playoff spot"},
+        {"label": "P%", "get": lambda r: r["Points %"], "kind": "num", "fmt": fmt_pct, "tip": "Points percentage"},
+        {"label": "GP", "get": lambda r: r["Games played"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Games played"},
+        {"label": "Last 10", "get": lambda r: r["Last 10 (points)"], "kind": "text", "tip": "Points won in the last 10 games"},
+    ]
+    body = f"""
+<h1>Red flags</h1>
+<p class="lead">Being in a playoff spot is not the same as being safe. Do warning signs make a team that is "in" more likely to miss?</p>
+<p class="note">Six warning signs, checked on teams that were in a playoff spot at Thanksgiving, Jan 1 or the trade deadline in 15 past seasons
+(2009-10 on). A flag is a reason to look closer, not a prediction. Terms such as cushion, PDO and AUC are explained on the <a href="about.html">About</a> page.</p>
+
+<h2>Right now <span class="note">&middot; teams in a playoff spot, games through {esc(through_text(note))}</span></h2>
+<p class="note">Sorted by number of flags, then by how thin the cushion is. Early in a season (about 20 games) flags are noisy.</p>
+{team_table("flags-table", right, cols, conference_map(standings))}
+
+<h2>What we found</h2>
+{verdict_list(v)}
+
+<h2>The six flags, one by one</h2>
+<p>"Missed" is how many flagged teams missed the playoffs after all, against equally safe teams without the flag. "Most consistent"
+means flagged teams missed more than equally safe teams at all three checkpoints.</p>
+{flag_table}
+
+<h2>Do flags stack?</h2>
+<p>How often teams in a playoff spot missed, by how many flags they had.</p>
+{stack_table}
+
+<h2>What the flags mean</h2>
+<dl class="glossary">{definitions}</dl>
+
+<h2>How it was tested, and the limits</h2>
+<ul>
+  <li>The six flags and their cut-offs (top or bottom quarter of the league that season) were fixed before looking at results.</li>
+  <li>Each flagged team is compared with teams the same distance above the playoff line, so a flag cannot win just by meaning "barely in".</li>
+  <li>With 6 flags at 3 checkpoints, a couple of strong-looking results can happen by chance, and the groups with 3 or more flags are small.</li>
+  <li>Only team statistics are used: no injuries, trades, schedule or shot quality.</li>
+</ul>
+<p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL.</p>
+"""
+    return page("Red flags - " + SITE_NAME, "studies", body, built_text)
+
+
+# ---- Slow starters ---------------------------------------------------------
+BAND_LABEL = {
+    "ALL teams out of a spot": "All teams out of a spot",
+    "Out: just out (within 0.03 below)": "Just out (within about 5 points)",
+    "Out: behind (0.03 to 0.08 below)": "Behind (about 5 to 13 points)",
+    "Out: far behind (more than 0.08 below)": "Far behind (more than about 13 points)",
+}
+
+
+def slow_starters_page(standings, built_text):
+    v = read_sheet(SLOW_FILE, "Verdict")
+    rates = read_sheet(SLOW_FILE, "Recovery rates")
+    takes = read_sheet(SLOW_FILE, "What it takes")
+    signs = read_sheet(SLOW_FILE, "The signs")
+    by_sign = read_sheet(SLOW_FILE, "Sign by sign")
+    who = read_sheet(SLOW_FILE, "Who recovered")
+    right = read_sheet(SLOW_FILE, "Right now", header=1)
+    note = read_note(SLOW_FILE)
+
+    checkpoints = ["Nov 1", "Thanksgiving", "Jan 1", "Trade deadline"]
+    rate_rows = []
+    for group, label in BAND_LABEL.items():
+        row = [label]
+        for cp in checkpoints:
+            p = rates[(rates["Checkpoint"] == cp) & (rates["Group"] == group)]
+            row.append(rate_text(p["Recovered"].iloc[0], p["Teams"].iloc[0]) if len(p) else "-")
+        rate_rows.append(row)
+    rate_table = static_table(["How far behind"] + [f"Out at {c}" if c != "Trade deadline" else "Out at the deadline" for c in checkpoints], rate_rows)
+
+    bands = [b for b in takes["Points % needed the rest of the way"].unique()]
+    take_rows = []
+    for band in bands:
+        row = [f"Needing {band.lower()}"]
+        for cp in ("Thanksgiving", "Jan 1"):
+            p = takes[(takes["Checkpoint"] == cp) & (takes["Points % needed the rest of the way"] == band)]
+            row.append(rate_text(p["Recovered"].iloc[0], p["Teams"].iloc[0]) if len(p) and p["Teams"].iloc[0] > 0 else "-")
+        take_rows.append(row)
+    take_table = static_table(["Points % needed over the rest of the season", "Recovered, out at Thanksgiving", "Recovered, out at Jan 1"], take_rows)
+
+    sign_rows = []
+    for _, s in signs.iterrows():
+        part = by_sign[by_sign["Sign"] == s["Sign"]]
+        sign_rows.append([s["Sign"], str(part["Verdict across the 4 checkpoints"].iloc[0]), s["What it means"]])
+    sign_table = static_table(["Sign of a coming recovery", "Verdict across 4 checkpoints", "What it means"], sign_rows, left=(0, 1, 2))
+
+    finalists = who[who["How the season ended"].isin(["Won Cup", "Lost Cup final"])]
+    final_rows = [[r["Season"], r["Team"], fmt_pct(r["Points % at Thanksgiving"]), fmt_pct(r["Points % needed the rest of the way"]), r["How the season ended"]]
+                  for _, r in finalists.iterrows()]
+    final_table = static_table(["Season", "Team", "Points % at Thanksgiving", "Points % needed the rest of the way", "How the season ended"],
+                               final_rows, left=(0, 1, 4))
+
+    right["Signs"] = right["Signs"].fillna("No signs")
+    history_col = [c for c in right.columns if c.startswith("Teams that far behind")][0]
+    history_at = re.search(r"behind at (.+?) \(history\)", history_col)
+    history_at = history_at.group(1) if history_at else "this point"
+    cols = [
+        {"label": "Team", "get": lambda r: r["Team"], "kind": "text", "first": "ascending",
+         "sub": lambda r: f"{r['How far behind'].capitalize()} (of teams this far behind at {history_at}, {r[history_col]}). {r['Signs']}"},
+        {"label": "Needs", "get": lambda r: r["Points % needed the rest of the way"], "kind": "num", "fmt": fmt_pct,
+         "tip": "Points % needed in the remaining games to reach the typical final cut line"},
+        {"label": "vs line", "get": lambda r: r["Points % vs the cut line (negative = below)"], "kind": "num", "fmt": lambda x: f"{x:+.3f}",
+         "tip": "Points % compared with the weakest team in a playoff spot (negative = below it)"},
+        {"label": "P%", "get": lambda r: r["Points %"], "kind": "num", "fmt": fmt_pct, "tip": "Points percentage"},
+        {"label": "GP", "get": lambda r: r["Games played"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Games played"},
+        {"label": "Signs", "get": lambda r: r["Number of signs"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Number of signs of a coming recovery"},
+    ]
+    body = f"""
+<h1>Slow starters</h1>
+<p class="lead">A team out of a playoff spot at Thanksgiving: how often does it recover, what does it take, and is there any sign of which ones will?</p>
+<p class="note">Teams that were out of a playoff spot at Nov 1, Thanksgiving, Jan 1 or the trade deadline in 15 past seasons (2009-10 on).
+A slow start is a reason to check how far behind a team is and what pace it needs, not a prediction. Terms such as cut line and AUC are explained on the <a href="about.html">About</a> page.</p>
+
+<h2>Right now <span class="note">&middot; teams out of a playoff spot, games through {esc(through_text(note))}</span></h2>
+<p class="note">"Needs" is the points % the team must earn in its remaining games to reach the typical final cut line. Early in a season the signs are noisy.</p>
+{team_table("slow-table", right, cols, conference_map(standings))}
+
+<h2>What we found</h2>
+{verdict_list(v)}
+
+<h2>How often teams recover</h2>
+<p>Teams out of a playoff spot at each checkpoint that made the playoffs after all, by how far behind they were.</p>
+{rate_table}
+
+<h2>What it takes</h2>
+<p>The points % a team had to earn over the rest of the season to reach the typical final cut line, and how often teams that needed it recovered.</p>
+{take_table}
+
+<h2>Signs of a coming recovery</h2>
+<p>Six signs, fixed in advance as the top or bottom quarter of the league: the mirror image of the <a href="red-flags.html">red flags</a>.
+"Most consistent" would mean teams with the sign recovered more than equally far behind teams at every checkpoint.</p>
+{sign_table}
+
+<h2>Slow starters that reached the Cup final</h2>
+<p>Of the {len(who)} teams out of a spot at Thanksgiving that recovered, these went all the way to the final.</p>
+{final_table}
+
+<h2>How it was tested, and the limits</h2>
+<ul>
+  <li>Each team with a sign is compared with teams the same distance behind, so a sign cannot win just by meaning "only slightly behind".</li>
+  <li>With 6 signs at 4 checkpoints, a few results will look interesting by chance. The groups are small (about 220 teams per checkpoint, 50 to 70 recoveries).</li>
+  <li>Team statistics only: no injuries, trades, schedule or goalie changes.</li>
+</ul>
+<p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL.</p>
+"""
+    return page("Slow starters - " + SITE_NAME, "studies", body, built_text)
+
+
+# ---- Goaltending in context ------------------------------------------------
+def goaltending_page(standings, built_text):
+    v = read_sheet(GOAL_FILE, "Verdict")
+    repeats = read_sheet(GOAL_FILE, "What repeats")
+    follow = read_sheet(GOAL_FILE, "Labels after Jan 1")
+    playoff = read_sheet(GOAL_FILE, "Playoff goaltending")
+    hot = read_sheet(GOAL_FILE, "Hot goalies")
+    right = read_sheet(GOAL_FILE, "Right now", header=1)
+    note = read_note(GOAL_FILE)
+
+    repeat_rows = [[r["Statistic"], r["Better when"], f"{r['Repeats (before vs after Jan 1)']:.2f}", str(r["Carry-over (share of the gap still there)"])]
+                   for _, r in repeats.iterrows()]
+    repeat_table = static_table(["Statistic", "Better when", "Repeats (before vs after Jan 1)", "Share of the gap still there"], repeat_rows)
+
+    points_col = "Standings points after Jan 1, vs what the record predicted"
+    follow_rows = [[r["Label (as of Jan 1)"], str(int(r["Team-seasons"])), fmt_pct(r["Points % before Jan 1"]), fmt_pct(r["Points % after Jan 1"]),
+                    f"{r[points_col]:+.1f} (+/-{r['Margin (+/-, 2 std. errors, in points)']:.1f})"] for _, r in follow.iterrows()]
+    follow_table = static_table(["Label as of Jan 1", "Team-seasons", "Points % before", "Points % after", "Points after Jan 1 vs what the record predicted"],
+                                follow_rows)
+
+    playoff_rows = [[r["How the playoffs ended"], str(int(r["Teams"])), f"{r['Playoff goaltending (avg percentile among playoff teams)']:.0f}",
+                     f"{r['Regular-season goaltending (avg percentile among playoff teams)']:.0f}", str(r["Share with positive playoff GSAx"]),
+                     f"{r['Average playoff GSAx (goals)']:+.1f}"] for _, r in playoff.iterrows()]
+    playoff_table = static_table(["How the playoffs ended", "Teams", "Playoff goaltending (percentile)", "Regular-season goaltending (percentile)",
+                                  "Had positive playoff GSAx", "Average playoff GSAx (goals)"], playoff_rows)
+
+    hot_rows = [[r["Season"], r["Team"], r["Starter"], r["How the playoffs ended"], f"{r['Playoff GSAx (goals)']:+.1f}",
+                 str(r["Regular-season rank among playoff teams"])] for _, r in hot.head(10).iterrows()]
+    hot_table = static_table(["Season", "Team", "Starter", "How the playoffs ended", "Playoff GSAx (goals)", "Regular-season goaltending rank"],
+                             hot_rows, left=(0, 1, 2, 3))
+
+    cols = [
+        {"label": "Team", "get": lambda r: r["Team"], "kind": "text", "first": "ascending", "sub": lambda r: r["Label"]},
+        {"label": "Defense", "get": lambda r: r["Defense rank (1 = best)"], "kind": "num", "fmt": lambda x: str(int(x)), "first": "ascending",
+         "tip": "Rank in the league for defense (expected goals against per 60, 5v5): 1 = best"},
+        {"label": "Goalie", "get": lambda r: r["Goaltending rank (1 = best)"], "kind": "num", "fmt": lambda x: str(int(x)), "first": "ascending",
+         "tip": "Rank in the league for goaltending (goals saved above expected per 60): 1 = best"},
+        {"label": "GSAx", "get": lambda r: r["GSAx (goals)"], "kind": "num", "fmt": lambda x: f"{x:+.1f}",
+         "tip": "Goals saved above expected so far this season"},
+        {"label": "GA", "get": lambda r: r["Goals against"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Goals against"},
+        {"label": "xGA", "get": lambda r: r["Expected goals against"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "tip": "Expected goals against"},
+        {"label": "GP", "get": lambda r: r["Games played"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Games played"},
+    ]
+    body = f"""
+<h1>Goaltending in context</h1>
+<p class="lead">Is a goalie bailing out a weak defense, or is a strong defense being let down by its goalie? And can anything foresee a hot playoff goalie?</p>
+<p class="note">Goals against split into two parts with MoneyPuck's shot-quality data: <strong>defense</strong> (how many goals the shots allowed should produce:
+expected goals against per 60 minutes at 5-on-5) and <strong>goaltending</strong> (goals saved above expected, "GSAx"). 15 past seasons, 2009-10 on.
+Terms are explained on the <a href="about.html">About</a> page. {MONEYPUCK_NOTE}</p>
+
+<h2>Right now <span class="note">&middot; games through {esc(through_text(note))}</span></h2>
+<p class="note">Teams are labeled "both good", "goalie bailing out the defense", "defense let down by the goalie" or "both weak" by whether each part is above or below the league median.
+Early in a season these labels are noisy.</p>
+{team_table("goalie-table", right, cols, conference_map(standings))}
+
+<h2>What we found</h2>
+{verdict_list(v)}
+
+<h2>What repeats</h2>
+<p>Does a team's number before Jan 1 look like its number after Jan 1? Near 0 means mostly luck; higher means a stable feature of the team.</p>
+{repeat_table}
+
+<h2>What happens after Jan 1, by label</h2>
+<p>How teams did over the rest of the season compared with what their record before Jan 1 predicted. Margins are about two standard errors.</p>
+{follow_table}
+
+<h2>Playoff goaltending</h2>
+<p>How each group of playoff teams ranked on goaltending, in the regular season and in the playoffs (percentile among playoff teams, 100 = best).</p>
+{playoff_table}
+
+<h2>The hottest playoff runs</h2>
+<p>The ten playoff runs with the most goals saved above expected, and where that team's goaltending ranked among the 16 playoff teams in the regular season.</p>
+{hot_table}
+
+<h2>How it was tested, and the limits</h2>
+<ul>
+  <li>The team numbers blend every goalie a team used, including the backup. Playoff data for individual goalies is not in the free files.</li>
+  <li>"Expected goals" is one reasonable shot-quality model, not the truth: shot quality it cannot see (screens, passes before the shot) shows up as goaltending.</li>
+  <li>"Defense" here means shot quality allowed, not individual defenders.</li>
+  <li>Forecast tests are built on the other seasons and used on the one they have never seen, with the same noise margins as the other pages.</li>
+</ul>
+<p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL and MoneyPuck.com.</p>
+"""
+    return page("Goaltending in context - " + SITE_NAME, "studies", body, built_text, moneypuck=True)
+
+
+# ---- The Studies hub -------------------------------------------------------
+def studies_page(available, built_text):
+    """available: list of (title, href, question, headline_text, tag) for the pages that exist."""
+    cards = "".join(
+        f'<li><strong><a href="{esc(href)}">{esc(title)}</a></strong><span class="tag live">Live</span><br>'
+        f'<span class="note">{esc(question)}</span><br><span>{esc(headline)}</span></li>'
+        for title, href, question, headline in available)
+    body = f"""
+<h1>Studies</h1>
+<p class="lead">Each study asks one hockey question of 15 seasons of NHL data (2009-10 on), tests the answer on seasons it has not seen,
+and says plainly when the evidence is thin.</p>
+<p class="note">Every page has a "Right now" list for the current season and a plain-English summary of what the history says.
+The pages are estimates from past patterns, not predictions or betting advice.</p>
+<ul class="roadmap">{cards}</ul>
+<h2>Coming next</h2>
+<ul class="roadmap">
+  <li><strong>Zone time and breakouts</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone, and how cleanly it gets out of its own end.</span></li>
+  <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
+</ul>
+"""
+    return page("Studies - " + SITE_NAME, "studies", body, built_text)
+
+
+# ----------------------------------------------------------------------------
 # main() is where the script starts.
 # ----------------------------------------------------------------------------
 def main():
@@ -479,11 +907,36 @@ def main():
         "index.html": home_page(schedule, standings, built_text),
         "about.html": about_page(built_text),
     }
+    available = []                                   # pages for the Studies hub
     if CONTENDER_FILE.exists():
         pages["contender-fit.html"] = contender_page(read_contender(CONTENDER_FILE), standings, built_text)
+        verdict = read_sheet(CONTENDER_FILE, "Verdict")
+        available.append(("Contender fit", "contender-fit.html",
+                          "Does a score built from NHL team stats pick the real conference finalists better than just ranking by points %?",
+                          "Headline: " + first_sentence(verdict[verdict.iloc[:, 0] == "Short answer"].iloc[0, 1])))
     else:
         print("Skipping the Contender fit page: outputs/contender_fit.xlsx not found.")
         print("  (run python scripts/build_contender_fit.py first; the existing page in docs/ is left as it is)")
+
+    study_pages = [
+        (RED_FILE, "red-flags.html", red_flags_page, "Red flags",
+         "Being in a playoff spot is not the same as being safe: do six warning signs make a team that is in more likely to miss?", "Base rate",
+         "python scripts/build_red_flags.py"),
+        (SLOW_FILE, "slow-starters.html", slow_starters_page, "Slow starters",
+         "A team out of a playoff spot at Thanksgiving: how often does it recover, what does it take, and is there any sign of which ones will?", "The Thanksgiving claim",
+         "python scripts/build_slow_starters.py"),
+        (GOAL_FILE, "goaltending.html", goaltending_page, "Goaltending in context",
+         "Is a goalie bailing out a weak defense, or a strong defense being let down by its goalie? And can anything foresee a hot playoff goalie?", "What repeats",
+         "python scripts/build_goaltending_study.py"),
+    ]
+    for workbook, filename, builder, title, question, key, command in study_pages:
+        if workbook.exists():
+            pages[filename] = builder(standings, built_text)
+            verdict = read_sheet(workbook, "Verdict")
+            available.append((title, filename, question, "Headline: " + first_sentence(verdict[verdict.iloc[:, 0] == key].iloc[0, 1])))
+        else:
+            print(f"Skipping the {title} page: {workbook.name} not found (run {command} first; the existing page in docs/ is left as it is)")
+    pages["studies.html"] = studies_page(available, built_text)
     for name, content in pages.items():
         (SITE_FOLDER / name).write_text(content, encoding="utf-8")
         print(f"Wrote docs/{name}  ({len(content):,} characters)")

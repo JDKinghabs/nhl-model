@@ -1,4 +1,4 @@
-"""
+﻿"""
 build_goaltending_study.py  -  goaltending in context: goalie bailing out the defense, or defense let down by the goalie?
 ===========================================================================================================================
 WHAT IT DOES (in Excel terms):
@@ -209,7 +209,7 @@ def label_followup(frame):
                      "Points % before Jan 1": round(g["pts_pct_td"].mean(), 3),
                      "Points % after Jan 1": round(g["pts_pct_rest"].mean(), 3),
                      "Points % after, vs what the record predicted": round(g["resid"].mean(), 4),
-                     "= standings points over the rest of the season": round(g["resid"].mean() * pts, 1),
+                     "Standings points after Jan 1, vs what the record predicted": round(g["resid"].mean() * pts, 1),
                      "Margin (+/-, 2 std. errors, in points)": round(2 * se * pts, 1)})
     return pd.DataFrame(rows)
 
@@ -410,9 +410,9 @@ def verdict_lines(stability, split_shares, follow, gain, predictors, champs, cha
          f"Defense repeats from before Jan 1 to after (correlation {r_def:.2f} for expected goals against); goaltending results repeat much less "
          f"({r_gs:.2f} for goals saved above expected, {r_sv:.2f} for raw save %). So the defensive part of goals against is the stable part, and most of what looks like goalie skill over a half season is noise."),
         ("Bailed out vs let down (after Jan 1)",
-         f"Teams labeled 'goalie bailing out the defense' earned {bail['= standings points over the rest of the season']:+.1f} standings points over the rest of the season relative to what their record predicted "
-         f"(margin +/-{bail['Margin (+/-, 2 std. errors, in points)']:.1f}); teams 'let down by the goalie' {let['= standings points over the rest of the season']:+.1f} (+/-{let['Margin (+/-, 2 std. errors, in points)']:.1f}); "
-         f"teams good at both {both_good['= standings points over the rest of the season']:+.1f}. A sign of regression to the mean, if the first is negative and the second positive."),
+         f"Teams labeled 'goalie bailing out the defense' earned {bail['Standings points after Jan 1, vs what the record predicted']:+.1f} standings points over the rest of the season relative to what their record predicted "
+         f"(margin +/-{bail['Margin (+/-, 2 std. errors, in points)']:.1f}); teams 'let down by the goalie' {let['Standings points after Jan 1, vs what the record predicted']:+.1f} (+/-{let['Margin (+/-, 2 std. errors, in points)']:.1f}); "
+         f"teams good at both {both_good['Standings points after Jan 1, vs what the record predicted']:+.1f}. A sign of regression to the mean, if the first is negative and the second positive."),
         ("Do the numbers improve the forecast?",
          "Gain in forecasting points % after Jan 1 beyond record and goal difference (R-squared): " +
          "; ".join(f"{name.split(':')[0]} - {name.split(': ', 1)[1]}: {value:+.3f}" for name, value in gains.items()) + ". Same hold-out test and noise level as the popular-stats check."),
@@ -524,7 +524,9 @@ def main():
     try:
         sheets["Right now"], current_labels = right_now(connection)
         label_source = pd.concat([label_source, current_labels], ignore_index=True)
-        notes["Right now"] = "Current season so far: teams labeled on defense (expected goals against /60, 5v5) and goaltending (GSAx /60). Early in the season these are noisy."
+        through = connection.execute("SELECT MAX(game_date) FROM mp_team_games WHERE season_id = (SELECT MAX(season_id) FROM team_seasons)").fetchone()[0]
+        notes["Right now"] = (f"Current season, games through {through}: teams labeled on defense (expected goals against /60, 5v5) and "
+                              f"goaltending (GSAx /60). Early in the season these are noisy.")
     except Exception as problem:                                              # noqa: BLE001
         print(f"  (Right now list skipped: {problem})")
     sheets["Goalies"] = goalies_table(goalies, seasons, label_source)

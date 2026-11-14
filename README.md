@@ -31,6 +31,12 @@ python scripts/pull_schedule_standings.py
 python scripts/build_site.py
 ```
 
+The research pages (Contender fit, Red flags, Slow starters, Goaltending in context and the Studies list) are built
+from the workbooks the studies write in `outputs/`. To refresh them for the current season, rerun the study scripts
+listed in the sections below (`build_contender_fit.py`, `build_red_flags.py`, `build_slow_starters.py`,
+`build_goaltending_study.py`) and then `python scripts/build_site.py`. A page whose workbook is missing is skipped and
+its existing page in `docs/` is left as it is.
+
 Then commit and push the changed files in `docs/`. The pages show summary results only, never the raw data files.
 
 ## Rebuilding the data

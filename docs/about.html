@@ -12,7 +12,7 @@
 <header class="site-header">
   <div class="wrap">
     <a class="brand" href="index.html">NHL Model</a>
-    <nav><a href="index.html">Home</a><a href="contender-fit.html">Contender fit</a><a href="about.html" aria-current="page">About</a></nav>
+    <nav><a href="index.html">Home</a><a href="contender-fit.html">Contender fit</a><a href="studies.html">Studies</a><a href="about.html" aria-current="page">About</a></nav>
   </div>
 </header>
 <main class="wrap">
@@ -29,8 +29,10 @@
 <h2>What is planned</h2>
 <ul class="roadmap">
   <li><strong><a href="contender-fit.html">Contender fit</a></strong><span class="tag live">Live</span><br><span class="note">How closely each team's profile matches teams that reached the conference finals in past seasons, and why. Version 1 uses NHL team stats only; shot-quality data comes next.</span></li>
-  <li><strong>Red flags</strong><span class="tag">Planned</span><br><span class="note">A simple checklist of warning signs, and how often teams with those signs have missed the playoffs.</span></li>
-  <li><strong>Slow starters</strong><span class="tag">Planned</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
+  <li><strong><a href="red-flags.html">Red flags</a></strong><span class="tag live">Live</span><br><span class="note">A simple checklist of warning signs, and how often teams with those signs have missed the playoffs.</span></li>
+  <li><strong><a href="slow-starters.html">Slow starters</a></strong><span class="tag live">Live</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
+  <li><strong><a href="goaltending.html">Goaltending in context</a></strong><span class="tag live">Live</span><br><span class="note">Whether a goalie is bailing out a weak defense or a strong defense is being let down, and whether a hot playoff goalie can be foreseen.</span></li>
+  <li><strong>Zone time and breakouts</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone and how cleanly it gets out of its own end.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 
@@ -46,9 +48,26 @@
   <dt>STRK</dt><dd>Current streak: W for wins, L for losses, OT for overtime losses.</dd>
 </dl>
 
+<h2>Terms used on the research pages</h2>
+<dl class="glossary">
+  <dt>Points %</dt><dd>Points won out of points available.</dd>
+  <dt>Corsi</dt><dd>Share of all shot attempts (shots on goal, misses and blocks) a team takes at 5-on-5. A measure of who controls play.</dd>
+  <dt>PDO</dt><dd>Shooting % plus save %. The league average is about 1.000, so a high PDO is usually good luck that tends to even out.</dd>
+  <dt>Expected goals</dt><dd>Each shot gets a probability of being a goal from where it was taken, the shot type and what happened before it. Adding them up measures shot quality.</dd>
+  <dt>GSAx</dt><dd>Goals saved above expected: the expected goals a goalie faced minus the goals he allowed.</dd>
+  <dt>High-danger shot</dt><dd>A shot from the most dangerous area of the ice (the slot), as defined by MoneyPuck.</dd>
+  <dt>Cut line, cushion</dt><dd>The cut line is the weakest team currently in a playoff spot. The cushion is how far above or below it a team is, in points %.</dd>
+  <dt>Percentile</dt><dd>Where a team ranks that season: 100 is the best in the league, 50 is average.</dd>
+  <dt>AUC</dt><dd>How well a ranking puts the teams that did something (such as reaching the conference finals) above the ones that did not. 1.0 is perfect, 0.5 is a coin flip.</dd>
+  <dt>Correlation</dt><dd>A number from -1 to +1 for how closely two things move together. About 0.3 is a modest link and 0.5 a strong one; it is usually worked out on ranks, so each season is compared fairly.</dd>
+  <dt>R-squared</dt><dd>The share of the differences between teams that a forecast explains. 0.25 means a quarter.</dd>
+  <dt>Lift</dt><dd>How much more often something happens to teams that meet a rule than to a random team.</dd>
+  <dt>Hold-out test</dt><dd>A rule is built on all seasons but one and tried on the one it has never seen, then repeated for each season.</dd>
+</dl>
+
 <div class="prose">
 <h2>Data and credits</h2>
-<p>Schedule and standings come from the NHL's public web data, &copy; NHL, used here for personal, non-commercial purposes. That data is unofficial and can change without notice. Other data sources, including <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, will be added to later pages and credited wherever their data is shown.</p>
+<p>Schedule and standings come from the NHL's public web data, &copy; NHL, used here for personal, non-commercial purposes. That data is unofficial and can change without notice. Shot-quality data (expected goals, shots by danger, goals saved above expected) comes from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used for non-commercial purposes with credit, and is credited on every page that uses it.</p>
 <p>No NHL logos are used. This site has no ads and does not sell anything.</p>
 
 <h2>Disclaimer</h2>
@@ -60,7 +79,7 @@
   <div class="wrap">
     <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>
     <p>For information and entertainment only. Nothing here is betting or financial advice.</p>
-    <p>Page built Nov 14, 2026 at 2:15 PM ET.</p>
+    <p>Page built Nov 14, 2026 at 3:56 PM ET.</p>
   </div>
 </footer>
 <script src="site.js"></script>
