@@ -101,6 +101,13 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    python scripts/build_goaltending_study.py
    ```
    The workbook is `outputs/goaltending_in_context.xlsx`: start with its "Verdict" sheet.
+10. Contender fit version 2 (needs the MoneyPuck tables): adds expected-goals share, high-danger shot share
+    and goaltending in context to version 1 and tests, with the same hold-out method, whether any of them picks
+    the real conference finalists better. It also checks why high-danger share is such a noisy statistic:
+    ```
+    python scripts/build_contender_fit_v2.py
+    ```
+    The workbook is `outputs/contender_fit_v2.xlsx`: start with its "Verdict" sheet.
 
 ## Downloading the MoneyPuck files (by hand)
 
