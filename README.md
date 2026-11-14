@@ -26,7 +26,9 @@ Then commit and push the changed files in `docs/`.
 The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). To recreate it:
 
 1. Install Python 3 and run `pip install -r requirements.txt`.
-2. Run the scripts in `scripts/` (each one explains itself at the top of the file).
+2. Run the scripts in `scripts/` (each one explains itself at the top of the file). For example,
+   `python scripts/build_reference_tables.py` builds `outputs/playoff_history.xlsx`: every playoff
+   series, champion and conference finalist since 2005-06, and how far every team went each season.
 
 ## Data sources and credits
 

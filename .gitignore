@@ -2,6 +2,9 @@
 # (See README.md for how to download it again.)
 data/
 
+# Excel reports and other results built from that data stay local too (for now)
+outputs/
+
 # Local tool settings (not part of the project)
 .claude/
 

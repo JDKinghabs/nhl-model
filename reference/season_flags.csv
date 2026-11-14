@@ -1,0 +1,5 @@
+season_id,include_main,issue,note
+20052006,Y,First season after the lockout; big rule changes,"Included but flagged thin: shot-quality data does not exist for this season."
+20122013,Y,48-game lockout-shortened season,"Included but flagged. Checkpoints use the same share of the season, not the same calendar date."
+20192020,N,Season cut short (about 68-71 games) and a 24-team bubble playoff,"Excluded from main results. Re-run as a sensitivity check."
+20202021,N,56 games; division-only schedule and division-based playoffs,"Excluded from main results. Re-run as a sensitivity check."
