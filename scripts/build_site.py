@@ -18,6 +18,7 @@ WHAT YOU SHOULD SEE:
 The look of the site lives in docs/style.css and docs/site.js (those are edited by hand).
 """
 
+import hashlib
 import html
 import re
 import sys
@@ -56,6 +57,9 @@ def page(title, active, body, built_text, moneypuck=False):
 
     credit = ('\n    <p>Shot-quality data: <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used for non-commercial purposes with credit.</p>'
               if moneypuck else "")
+    # A short fingerprint of the style and script files, added to their links. When either file changes the link changes,
+    # so a browser can never mix a new page with an old cached copy of its script or style.
+    version = hashlib.md5(b"".join((SITE_FOLDER / name).read_bytes() for name in ("style.css", "site.js"))).hexdigest()[:8]
 
     return f"""<!doctype html>
 <html lang="en">
@@ -65,7 +69,7 @@ def page(title, active, body, built_text, moneypuck=False):
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(TAGLINE)}">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏒</text></svg>">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v={version}">
 </head>
 <body>
 <header class="site-header">
@@ -84,7 +88,7 @@ def page(title, active, body, built_text, moneypuck=False):
     <p>{esc(built_text)}</p>
   </div>
 </footer>
-<script src="site.js"></script>
+<script src="site.js?v={version}"></script>
 </body>
 </html>
 """
@@ -514,7 +518,7 @@ def rules_section(rules, factors, through):
             f"<td>{r['Champion rate for such teams']:.0%}</td><td>{r['Lift over a random team']:.1f}x</td>"
             f"<td class='pts' data-v='{n_fit}'>{n_fit}</td></tr>")
         panels.append(
-            f"<div class='rule-panel' id='rule-panel-{i}' hidden><h3>Teams that fit &ldquo;{esc(r['Rule'])}&rdquo; right now</h3>"
+            f"<div class='rule-panel' id='rule-panel-{i}'><h3>Teams that fit &ldquo;{esc(r['Rule'])}&rdquo; right now</h3>"
             f"{rule_detail(factors, top_n, k, through)}</div>")
     return f"""
 <h2>Is "top 5 in most of the factors" a rule for finding the champion?</h2>

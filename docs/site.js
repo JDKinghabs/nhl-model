@@ -44,7 +44,10 @@
   });
 
   // 4) Rule rows that open a panel under the table ("which teams fit this rule right now"). One panel open at a time.
+  // Without this script every list simply stays visible under the table, so nothing is ever hidden behind a dead button.
+  // The 'js' class is what hides the lists until a row is clicked.
   var ruleButtons = document.querySelectorAll('button.rule-toggle');
+  if (ruleButtons.length) document.documentElement.classList.add('js');
   ruleButtons.forEach(function (button) {
     var row = button.closest('tr');
     function toggle() {
@@ -54,12 +57,12 @@
         other.setAttribute('aria-expanded', 'false');
         other.closest('tr').classList.remove('open');
         var otherPanel = document.getElementById(other.getAttribute('data-panel'));
-        if (otherPanel) otherPanel.hidden = true;
+        if (otherPanel) otherPanel.classList.remove('open');
       });
       if (!wasOpen && panel) {                                    // then open this one (clicking an open row closes it)
         button.setAttribute('aria-expanded', 'true');
         row.classList.add('open');
-        panel.hidden = false;
+        panel.classList.add('open');
         if (panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
     }

@@ -122,6 +122,8 @@ button.rule-toggle { font: inherit; font-weight: 600; color: var(--accent); back
 button.rule-toggle::after { content: " \25BE"; font-size: 0.85em; }
 button.rule-toggle[aria-expanded="true"]::after { content: " \25B4"; }
 tr.rule-row.open td { background: var(--accent-soft); }
+.js .rule-panel { display: none; }
+.js .rule-panel.open { display: block; }
 .rule-panel { margin-top: 14px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius); }
 .rule-panel h3 { margin: 0 0 8px; font-size: 1.05rem; }
 .rule-panel p { margin: 0 0 8px; }
