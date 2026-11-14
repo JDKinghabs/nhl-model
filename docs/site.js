@@ -46,8 +46,16 @@
   // 4) Rule rows that open a panel under the table ("which teams fit this rule right now"). One panel open at a time.
   // Without this script every list simply stays visible under the table, so nothing is ever hidden behind a dead button.
   // The 'js' class is what hides the lists until a row is clicked.
+  // Panels are opened and closed with BOTH a class and the 'hidden' attribute, so this works whichever version of the
+  // page or stylesheet a browser has cached.
   var ruleButtons = document.querySelectorAll('button.rule-toggle');
   if (ruleButtons.length) document.documentElement.classList.add('js');
+  function setPanel(panel, open) {
+    if (!panel) return;
+    panel.hidden = !open;
+    panel.classList.toggle('open', open);
+  }
+  ruleButtons.forEach(function (button) { setPanel(document.getElementById(button.getAttribute('data-panel')), false); });
   ruleButtons.forEach(function (button) {
     var row = button.closest('tr');
     function toggle() {
@@ -56,13 +64,12 @@
       ruleButtons.forEach(function (other) {                       // close everything first
         other.setAttribute('aria-expanded', 'false');
         other.closest('tr').classList.remove('open');
-        var otherPanel = document.getElementById(other.getAttribute('data-panel'));
-        if (otherPanel) otherPanel.classList.remove('open');
+        setPanel(document.getElementById(other.getAttribute('data-panel')), false);
       });
       if (!wasOpen && panel) {                                    // then open this one (clicking an open row closes it)
         button.setAttribute('aria-expanded', 'true');
         row.classList.add('open');
-        panel.classList.add('open');
+        setPanel(panel, true);
         if (panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
     }
