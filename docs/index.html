@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NHL Model</title>
+<meta name="description" content="Independent hockey analytics: who is really good, who is likely to miss the playoffs, and how teams change over a season.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏒</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="index.html">NHL Model</a>
+    <nav><a href="index.html" aria-current="page">Home</a><a href="about.html">About</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+<h1>NHL Model</h1>
+<p class="lead">Independent hockey analytics: who is really good, who is likely to miss the playoffs, and how teams change over a season.</p>
+<p class="note">Early version: tonight's games and the standings. Contender ratings and more are on the way. See <a href="about.html">About</a>.</p>
+
+<h2>Tonight <span class="note">&middot; Friday, November 13</span></h2>
+<ul class="games">
+    <li class="game">
+      <div class="matchup">
+        <span>NYR</span> <span class="rec">11-8-1</span>
+        <span class="at">at</span>
+        <span>VAN</span> <span class="rec">3-16-1</span>
+      </div>
+      <div class="meta"><time datetime="2026-11-14T02:00:00Z" data-local>9:00 PM ET</time> &middot; Rogers Arena</div>
+      <div class="status live">In progress &middot; NYR 0, VAN 0</div>
+    </li>
+    <li class="game">
+      <div class="matchup">
+        <span>NSH</span> <span class="rec">10-4-5</span>
+        <span class="at">at</span>
+        <span>VGK</span> <span class="rec">13-5-2</span>
+      </div>
+      <div class="meta"><time datetime="2026-11-14T03:00:00Z" data-local>10:00 PM ET</time> &middot; T-Mobile Arena</div>
+      <div class="status">Scheduled</div>
+    </li>
+</ul>
+
+<h2>Standings <span class="note">&middot; through Friday, November 13</span></h2>
+<div class="chips" data-filter-group="standings" role="group" aria-label="Filter standings">
+  <button type="button" data-filter="all" aria-pressed="true">League</button>
+  <button type="button" data-filter="Eastern" aria-pressed="false">Eastern</button>
+  <button type="button" data-filter="Western" aria-pressed="false">Western</button>
+</div>
+<div class="table-wrap">
+<table class="sortable" id="standings">
+<caption class="note" style="text-align:left;padding:0 0 8px;caption-side:bottom">Click a column heading to sort. Hover a heading for what it means.</caption>
+<thead><tr><th class="" data-sort="num" data-first="ascending" title="Rank in the league (by points)" scope="col"><button type="button">#</button></th><th class="left" data-sort="text" data-first="ascending" title="Team" scope="col"><button type="button">Team</button></th><th class="" data-sort="num" title="Games played" scope="col"><button type="button">GP</button></th><th class="" data-sort="num" title="Wins" scope="col"><button type="button">W</button></th><th class="" data-sort="num" title="Regulation losses" scope="col"><button type="button">L</button></th><th class="" data-sort="num" title="Overtime / shootout losses" scope="col"><button type="button">OTL</button></th><th class="" data-sort="num" title="Points" scope="col"><button type="button">PTS</button></th><th class="" data-sort="num" title="Points percentage: points won out of points available" scope="col"><button type="button">P%</button></th><th class="" data-sort="num" title="Regulation + overtime wins (first tiebreaker after points)" scope="col"><button type="button">ROW</button></th><th class="" data-sort="num" title="Goals for" scope="col"><button type="button">GF</button></th><th class="" data-sort="num" data-first="ascending" title="Goals against" scope="col"><button type="button">GA</button></th><th class="" data-sort="num" title="Goal difference" scope="col"><button type="button">GD</button></th><th class="" data-sort="num" title="Record in the last 10 games (W-L-OTL)" scope="col"><button type="button">L10</button></th><th class="left" data-sort="text" title="Current streak (W = winning, L = losing, OTL = overtime losses)" scope="col"><button type="button">STRK</button></th></tr></thead>
+<tbody>
+<tr data-conf="Eastern"><td data-v="1">1</td><td class="team left" data-v="Carolina Hurricanes">CAR<span class="full">Carolina Hurricanes</span></td><td data-v="20">20</td><td data-v="15">15</td><td data-v="3">3</td><td data-v="2">2</td><td class="pts" data-v="32">32</td><td data-v="0.8">.800</td><td data-v="15">15</td><td data-v="82">82</td><td data-v="46">46</td><td class="pos" data-v="36">+36</td><td data-v="8">8-1-1</td><td class="left" data-v="">W3</td></tr>
+<tr data-conf="Western"><td data-v="2">2</td><td class="team left" data-v="Minnesota Wild">MIN<span class="full">Minnesota Wild</span></td><td data-v="21">21</td><td data-v="14">14</td><td data-v="3">3</td><td data-v="4">4</td><td class="pts" data-v="32">32</td><td data-v="0.762">.762</td><td data-v="14">14</td><td data-v="70">70</td><td data-v="46">46</td><td class="pos" data-v="24">+24</td><td data-v="8">8-0-2</td><td class="left" data-v="">W2</td></tr>
+<tr data-conf="Western"><td data-v="3">3</td><td class="team left" data-v="Edmonton Oilers">EDM<span class="full">Edmonton Oilers</span></td><td data-v="20">20</td><td data-v="14">14</td><td data-v="3">3</td><td data-v="3">3</td><td class="pts" data-v="31">31</td><td data-v="0.775">.775</td><td data-v="13">13</td><td data-v="81">81</td><td data-v="58">58</td><td class="pos" data-v="23">+23</td><td data-v="6">6-2-2</td><td class="left" data-v="">W3</td></tr>
+<tr data-conf="Eastern"><td data-v="4">4</td><td class="team left" data-v="Tampa Bay Lightning">TBL<span class="full">Tampa Bay Lightning</span></td><td data-v="19">19</td><td data-v="13">13</td><td data-v="4">4</td><td data-v="2">2</td><td class="pts" data-v="28">28</td><td data-v="0.737">.737</td><td data-v="13">13</td><td data-v="74">74</td><td data-v="57">57</td><td class="pos" data-v="17">+17</td><td data-v="6">6-2-2</td><td class="left" data-v="">W2</td></tr>
+<tr data-conf="Eastern"><td data-v="5">5</td><td class="team left" data-v="Montréal Canadiens">MTL<span class="full">Montréal Canadiens</span></td><td data-v="19">19</td><td data-v="12">12</td><td data-v="3">3</td><td data-v="4">4</td><td class="pts" data-v="28">28</td><td data-v="0.737">.737</td><td data-v="10">10</td><td data-v="67">67</td><td data-v="57">57</td><td class="pos" data-v="10">+10</td><td data-v="8">8-0-2</td><td class="left" data-v="">W1</td></tr>
+<tr data-conf="Western"><td data-v="6">6</td><td class="team left" data-v="Vegas Golden Knights">VGK<span class="full">Vegas Golden Knights</span></td><td data-v="20">20</td><td data-v="13">13</td><td data-v="5">5</td><td data-v="2">2</td><td class="pts" data-v="28">28</td><td data-v="0.7">.700</td><td data-v="12">12</td><td data-v="69">69</td><td data-v="54">54</td><td class="pos" data-v="15">+15</td><td data-v="5">5-3-2</td><td class="left" data-v="">W4</td></tr>
+<tr data-conf="Eastern"><td data-v="7">7</td><td class="team left" data-v="New Jersey Devils">NJD<span class="full">New Jersey Devils</span></td><td data-v="20">20</td><td data-v="14">14</td><td data-v="6">6</td><td data-v="0">0</td><td class="pts" data-v="28">28</td><td data-v="0.7">.700</td><td data-v="13">13</td><td data-v="73">73</td><td data-v="57">57</td><td class="pos" data-v="16">+16</td><td data-v="8">8-2-0</td><td class="left" data-v="">W1</td></tr>
+<tr data-conf="Eastern"><td data-v="8">8</td><td class="team left" data-v="Boston Bruins">BOS<span class="full">Boston Bruins</span></td><td data-v="19">19</td><td data-v="13">13</td><td data-v="5">5</td><td data-v="1">1</td><td class="pts" data-v="27">27</td><td data-v="0.711">.711</td><td data-v="12">12</td><td data-v="70">70</td><td data-v="46">46</td><td class="pos" data-v="24">+24</td><td data-v="6">6-3-1</td><td class="left" data-v="">L1</td></tr>
+<tr data-conf="Eastern"><td data-v="9">9</td><td class="team left" data-v="Ottawa Senators">OTT<span class="full">Ottawa Senators</span></td><td data-v="20">20</td><td data-v="12">12</td><td data-v="6">6</td><td data-v="2">2</td><td class="pts" data-v="26">26</td><td data-v="0.65">.650</td><td data-v="10">10</td><td data-v="64">64</td><td data-v="60">60</td><td class="pos" data-v="4">+4</td><td data-v="5">5-3-2</td><td class="left" data-v="">W1</td></tr>
+<tr data-conf="Western"><td data-v="10">10</td><td class="team left" data-v="Nashville Predators">NSH<span class="full">Nashville Predators</span></td><td data-v="19">19</td><td data-v="10">10</td><td data-v="4">4</td><td data-v="5">5</td><td class="pts" data-v="25">25</td><td data-v="0.658">.658</td><td data-v="9">9</td><td data-v="59">59</td><td data-v="53">53</td><td class="pos" data-v="6">+6</td><td data-v="7">7-1-2</td><td class="left" data-v="">W6</td></tr>
+<tr data-conf="Western"><td data-v="11">11</td><td class="team left" data-v="Colorado Avalanche">COL<span class="full">Colorado Avalanche</span></td><td data-v="20">20</td><td data-v="11">11</td><td data-v="6">6</td><td data-v="3">3</td><td class="pts" data-v="25">25</td><td data-v="0.625">.625</td><td data-v="11">11</td><td data-v="81">81</td><td data-v="63">63</td><td class="pos" data-v="18">+18</td><td data-v="6">6-2-2</td><td class="left" data-v="">OT1</td></tr>
+<tr data-conf="Eastern"><td data-v="12">12</td><td class="team left" data-v="Florida Panthers">FLA<span class="full">Florida Panthers</span></td><td data-v="20">20</td><td data-v="11">11</td><td data-v="7">7</td><td data-v="2">2</td><td class="pts" data-v="24">24</td><td data-v="0.6">.600</td><td data-v="11">11</td><td data-v="65">65</td><td data-v="60">60</td><td class="pos" data-v="5">+5</td><td data-v="6">6-4-0</td><td class="left" data-v="">W2</td></tr>
+<tr data-conf="Eastern"><td data-v="13">13</td><td class="team left" data-v="New York Rangers">NYR<span class="full">New York Rangers</span></td><td data-v="20">20</td><td data-v="11">11</td><td data-v="8">8</td><td data-v="1">1</td><td class="pts" data-v="23">23</td><td data-v="0.575">.575</td><td data-v="11">11</td><td data-v="59">59</td><td data-v="56">56</td><td class="pos" data-v="3">+3</td><td data-v="5">5-5-0</td><td class="left" data-v="">W1</td></tr>
+<tr data-conf="Western"><td data-v="14">14</td><td class="team left" data-v="Dallas Stars">DAL<span class="full">Dallas Stars</span></td><td data-v="18">18</td><td data-v="10">10</td><td data-v="6">6</td><td data-v="2">2</td><td class="pts" data-v="22">22</td><td data-v="0.611">.611</td><td data-v="9">9</td><td data-v="52">52</td><td data-v="49">49</td><td class="pos" data-v="3">+3</td><td data-v="6">6-3-1</td><td class="left" data-v="">L1</td></tr>
+<tr data-conf="Western"><td data-v="15">15</td><td class="team left" data-v="Utah Mammoth">UTA<span class="full">Utah Mammoth</span></td><td data-v="20">20</td><td data-v="10">10</td><td data-v="8">8</td><td data-v="2">2</td><td class="pts" data-v="22">22</td><td data-v="0.55">.550</td><td data-v="10">10</td><td data-v="66">66</td><td data-v="69">69</td><td class="neg" data-v="-3">-3</td><td data-v="3">3-5-2</td><td class="left" data-v="">OT1</td></tr>
+<tr data-conf="Western"><td data-v="16">16</td><td class="team left" data-v="Anaheim Ducks">ANA<span class="full">Anaheim Ducks</span></td><td data-v="19">19</td><td data-v="10">10</td><td data-v="8">8</td><td data-v="1">1</td><td class="pts" data-v="21">21</td><td data-v="0.553">.553</td><td data-v="10">10</td><td data-v="71">71</td><td data-v="70">70</td><td class="pos" data-v="1">+1</td><td data-v="6">6-3-1</td><td class="left" data-v="">L1</td></tr>
+<tr data-conf="Western"><td data-v="17">17</td><td class="team left" data-v="Winnipeg Jets">WPG<span class="full">Winnipeg Jets</span></td><td data-v="20">20</td><td data-v="9">9</td><td data-v="8">8</td><td data-v="3">3</td><td class="pts" data-v="21">21</td><td data-v="0.525">.525</td><td data-v="9">9</td><td data-v="61">61</td><td data-v="68">68</td><td class="neg" data-v="-7">-7</td><td data-v="5">5-5-0</td><td class="left" data-v="">W5</td></tr>
+<tr data-conf="Eastern"><td data-v="18">18</td><td class="team left" data-v="Washington Capitals">WSH<span class="full">Washington Capitals</span></td><td data-v="17">17</td><td data-v="10">10</td><td data-v="7">7</td><td data-v="0">0</td><td class="pts" data-v="20">20</td><td data-v="0.588">.588</td><td data-v="10">10</td><td data-v="58">58</td><td data-v="58">58</td><td class="" data-v="0">0</td><td data-v="6">6-4-0</td><td class="left" data-v="">L1</td></tr>
+<tr data-conf="Eastern"><td data-v="19">19</td><td class="team left" data-v="New York Islanders">NYI<span class="full">New York Islanders</span></td><td data-v="18">18</td><td data-v="8">8</td><td data-v="6">6</td><td data-v="4">4</td><td class="pts" data-v="20">20</td><td data-v="0.556">.556</td><td data-v="7">7</td><td data-v="54">54</td><td data-v="54">54</td><td class="" data-v="0">0</td><td data-v="4">4-3-3</td><td class="left" data-v="">W1</td></tr>
+<tr data-conf="Western"><td data-v="20">20</td><td class="team left" data-v="St. Louis Blues">STL<span class="full">St. Louis Blues</span></td><td data-v="19">19</td><td data-v="9">9</td><td data-v="8">8</td><td data-v="2">2</td><td class="pts" data-v="20">20</td><td data-v="0.526">.526</td><td data-v="8">8</td><td data-v="54">54</td><td data-v="55">55</td><td class="neg" data-v="-1">-1</td><td data-v="5">5-4-1</td><td class="left" data-v="">W2</td></tr>
+<tr data-conf="Eastern"><td data-v="21">21</td><td class="team left" data-v="Buffalo Sabres">BUF<span class="full">Buffalo Sabres</span></td><td data-v="19">19</td><td data-v="8">8</td><td data-v="7">7</td><td data-v="4">4</td><td class="pts" data-v="20">20</td><td data-v="0.526">.526</td><td data-v="8">8</td><td data-v="55">55</td><td data-v="68">68</td><td class="neg" data-v="-13">-13</td><td data-v="4">4-4-2</td><td class="left" data-v="">OT1</td></tr>
+<tr data-conf="Western"><td data-v="22">22</td><td class="team left" data-v="Seattle Kraken">SEA<span class="full">Seattle Kraken</span></td><td data-v="17">17</td><td data-v="9">9</td><td data-v="7">7</td><td data-v="1">1</td><td class="pts" data-v="19">19</td><td data-v="0.559">.559</td><td data-v="7">7</td><td data-v="58">58</td><td data-v="61">61</td><td class="neg" data-v="-3">-3</td><td data-v="4">4-5-1</td><td class="left" data-v="">L2</td></tr>
+<tr data-conf="Eastern"><td data-v="23">23</td><td class="team left" data-v="Toronto Maple Leafs">TOR<span class="full">Toronto Maple Leafs</span></td><td data-v="21">21</td><td data-v="8">8</td><td data-v="11">11</td><td data-v="2">2</td><td class="pts" data-v="18">18</td><td data-v="0.429">.429</td><td data-v="8">8</td><td data-v="69">69</td><td data-v="75">75</td><td class="neg" data-v="-6">-6</td><td data-v="3">3-7-0</td><td class="left" data-v="">L5</td></tr>
+<tr data-conf="Western"><td data-v="24">24</td><td class="team left" data-v="San Jose Sharks">SJS<span class="full">San Jose Sharks</span></td><td data-v="21">21</td><td data-v="8">8</td><td data-v="11">11</td><td data-v="2">2</td><td class="pts" data-v="18">18</td><td data-v="0.429">.429</td><td data-v="6">6</td><td data-v="53">53</td><td data-v="74">74</td><td class="neg" data-v="-21">-21</td><td data-v="2">2-7-1</td><td class="left" data-v="">OT1</td></tr>
+<tr data-conf="Western"><td data-v="25">25</td><td class="team left" data-v="Calgary Flames">CGY<span class="full">Calgary Flames</span></td><td data-v="19">19</td><td data-v="8">8</td><td data-v="10">10</td><td data-v="1">1</td><td class="pts" data-v="17">17</td><td data-v="0.447">.447</td><td data-v="8">8</td><td data-v="47">47</td><td data-v="66">66</td><td class="neg" data-v="-19">-19</td><td data-v="5">5-4-1</td><td class="left" data-v="">L1</td></tr>
+<tr data-conf="Eastern"><td data-v="26">26</td><td class="team left" data-v="Detroit Red Wings">DET<span class="full">Detroit Red Wings</span></td><td data-v="20">20</td><td data-v="7">7</td><td data-v="10">10</td><td data-v="3">3</td><td class="pts" data-v="17">17</td><td data-v="0.425">.425</td><td data-v="5">5</td><td data-v="55">55</td><td data-v="64">64</td><td class="neg" data-v="-9">-9</td><td data-v="3">3-7-0</td><td class="left" data-v="">L5</td></tr>
+<tr data-conf="Eastern"><td data-v="27">27</td><td class="team left" data-v="Pittsburgh Penguins">PIT<span class="full">Pittsburgh Penguins</span></td><td data-v="19">19</td><td data-v="7">7</td><td data-v="10">10</td><td data-v="2">2</td><td class="pts" data-v="16">16</td><td data-v="0.421">.421</td><td data-v="5">5</td><td data-v="61">61</td><td data-v="67">67</td><td class="neg" data-v="-6">-6</td><td data-v="4">4-5-1</td><td class="left" data-v="">W1</td></tr>
+<tr data-conf="Eastern"><td data-v="28">28</td><td class="team left" data-v="Philadelphia Flyers">PHI<span class="full">Philadelphia Flyers</span></td><td data-v="21">21</td><td data-v="5">5</td><td data-v="10">10</td><td data-v="6">6</td><td class="pts" data-v="16">16</td><td data-v="0.381">.381</td><td data-v="5">5</td><td data-v="47">47</td><td data-v="69">69</td><td class="neg" data-v="-22">-22</td><td data-v="3">3-4-3</td><td class="left" data-v="">OT1</td></tr>
+<tr data-conf="Eastern"><td data-v="29">29</td><td class="team left" data-v="Columbus Blue Jackets">CBJ<span class="full">Columbus Blue Jackets</span></td><td data-v="17">17</td><td data-v="7">7</td><td data-v="10">10</td><td data-v="0">0</td><td class="pts" data-v="14">14</td><td data-v="0.412">.412</td><td data-v="5">5</td><td data-v="42">42</td><td data-v="54">54</td><td class="neg" data-v="-12">-12</td><td data-v="4">4-6-0</td><td class="left" data-v="">L3</td></tr>
+<tr data-conf="Western"><td data-v="30">30</td><td class="team left" data-v="Los Angeles Kings">LAK<span class="full">Los Angeles Kings</span></td><td data-v="17">17</td><td data-v="5">5</td><td data-v="10">10</td><td data-v="2">2</td><td class="pts" data-v="12">12</td><td data-v="0.353">.353</td><td data-v="5">5</td><td data-v="47">47</td><td data-v="60">60</td><td class="neg" data-v="-13">-13</td><td data-v="4">4-6-0</td><td class="left" data-v="">L3</td></tr>
+<tr data-conf="Western"><td data-v="31">31</td><td class="team left" data-v="Chicago Blackhawks">CHI<span class="full">Chicago Blackhawks</span></td><td data-v="19">19</td><td data-v="5">5</td><td data-v="13">13</td><td data-v="1">1</td><td class="pts" data-v="11">11</td><td data-v="0.289">.289</td><td data-v="5">5</td><td data-v="42">42</td><td data-v="78">78</td><td class="neg" data-v="-36">-36</td><td data-v="2">2-7-1</td><td class="left" data-v="">W1</td></tr>
+<tr data-conf="Western"><td data-v="32">32</td><td class="team left" data-v="Vancouver Canucks">VAN<span class="full">Vancouver Canucks</span></td><td data-v="20">20</td><td data-v="3">3</td><td data-v="16">16</td><td data-v="1">1</td><td class="pts" data-v="7">7</td><td data-v="0.175">.175</td><td data-v="3">3</td><td data-v="56">56</td><td data-v="90">90</td><td class="neg" data-v="-34">-34</td><td data-v="1">1-9-0</td><td class="left" data-v="">L6</td></tr>
+</tbody>
+</table>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>
+    <p>For information and entertainment only. Nothing here is betting or financial advice.</p>
+    <p>Page built Nov 13, 2026 at 9:15 PM ET.</p>
+  </div>
+</footer>
+<script src="site.js"></script>
+</body>
+</html>

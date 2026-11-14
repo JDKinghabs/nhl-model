@@ -1,0 +1,14 @@
+# Raw and processed data stays on your own computer, never on GitHub.
+# (See README.md for how to download it again.)
+data/
+
+# Local tool settings (not part of the project)
+.claude/
+
+# Python housekeeping files
+__pycache__/
+*.pyc
+.venv/
+
+# Excel creates these temporary lock files while a workbook/CSV is open
+~$*
