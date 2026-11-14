@@ -85,6 +85,14 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    python scripts/build_red_flags.py
    ```
    The workbook is `outputs/red_flags.xlsx`: start with its "Verdict" sheet.
+8. The slow-starter study: for teams that were out of a playoff spot at Nov 1, Thanksgiving, Jan 1 or the
+   deadline, how often do they recover (by how far behind), what points pace does it take, do six "signs of a
+   coming recovery" separate the ones that do, and who are today's slow starters? (asks the NHL for one
+   standings page):
+   ```
+   python scripts/build_slow_starters.py
+   ```
+   The workbook is `outputs/slow_starters.xlsx`: start with its "Verdict" sheet.
 
 ## Data sources and credits
 
