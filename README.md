@@ -12,14 +12,26 @@ A hockey analytics project that rates NHL **teams** and **players** in different
 
 ## Updating the website
 
-The site is the `docs/` folder, published with GitHub Pages. To refresh it:
+The site is the `docs/` folder, published with GitHub Pages. To refresh the home page (tonight's games and
+standings):
 
 ```
 python scripts/pull_schedule_standings.py
 python scripts/build_site.py
 ```
 
-Then commit and push the changed files in `docs/`.
+To also refresh the **Contender fit** page (the current-season ranking comes from the latest games), update the
+game data and the database first. This takes a few minutes because it waits politely between requests:
+
+```
+python scripts/pull_game_results.py
+python scripts/build_database.py
+python scripts/build_contender_fit.py
+python scripts/pull_schedule_standings.py
+python scripts/build_site.py
+```
+
+Then commit and push the changed files in `docs/`. The pages show summary results only, never the raw data files.
 
 ## Rebuilding the data
 

@@ -9,14 +9,17 @@ WHAT IT DOES (in Excel terms):
 HOW TO RUN IT (after pull_schedule_standings.py):
     python scripts/build_site.py
 
+    The Contender fit page also reads outputs/contender_fit.xlsx (made by build_contender_fit.py).
+
 WHAT YOU SHOULD SEE:
-    "Wrote docs/index.html" and "Wrote docs/about.html".
+    "Wrote docs/index.html", "Wrote docs/about.html" and "Wrote docs/contender-fit.html".
     Then double-click docs/index.html to preview the site in your browser.
 
 The look of the site lives in docs/style.css and docs/site.js (those are edited by hand).
 """
 
 import html
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -65,7 +68,7 @@ def page(title, active, body, built_text):
 <header class="site-header">
   <div class="wrap">
     <a class="brand" href="index.html">{esc(SITE_NAME)}</a>
-    <nav>{link("index.html", "Home", "home")}{link("about.html", "About", "about")}</nav>
+    <nav>{link("index.html", "Home", "home")}{link("contender-fit.html", "Contender fit", "contender")}{link("about.html", "About", "about")}</nav>
   </div>
 </header>
 <main class="wrap">
@@ -217,7 +220,7 @@ def home_page(schedule, standings, built_text):
     body = f"""
 <h1>{esc(SITE_NAME)}</h1>
 <p class="lead">{esc(TAGLINE)}</p>
-<p class="note">Early version: tonight's games and the standings. Contender ratings and more are on the way. See <a href="about.html">About</a>.</p>
+<p class="note">Tonight's games and the standings. New: <a href="contender-fit.html">Contender fit</a>, how each team's season so far compares with teams that went on to reach the conference finals. More research pages are on the way: see <a href="about.html">About</a>.</p>
 {games_section(schedule, standings)}
 {standings_section(standings)}
 """
@@ -237,7 +240,7 @@ def about_page(built_text):
 
 <h2>What is planned</h2>
 <ul class="roadmap">
-  <li><strong>Contender fit</strong><span class="tag">Planned</span><br><span class="note">How closely each team's profile matches teams that reached the conference finals in past seasons, and why.</span></li>
+  <li><strong><a href="contender-fit.html">Contender fit</a></strong><span class="tag live">Live</span><br><span class="note">How closely each team's profile matches teams that reached the conference finals in past seasons, and why. Version 1 uses NHL team stats only; shot-quality data comes next.</span></li>
   <li><strong>Red flags</strong><span class="tag">Planned</span><br><span class="note">A simple checklist of warning signs, and how often teams with those signs have missed the playoffs.</span></li>
   <li><strong>Slow starters</strong><span class="tag">Planned</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
@@ -268,6 +271,189 @@ def about_page(built_text):
 
 
 # ----------------------------------------------------------------------------
+# The Contender fit page (reads the workbook written by build_contender_fit.py)
+# ----------------------------------------------------------------------------
+CONTENDER_FILE = PROJECT_FOLDER / "outputs" / "contender_fit.xlsx"
+REPO_URL = "https://github.com/JDKinghabs/nhl-model"
+
+VERDICT_LABELS = {
+    "Short answer": "Short answer", "Season by season": "Season by season", "When it helps": "When it helps",
+    "What each idea adds": "What each idea adds", "How predictable is it at all?": "How predictable is it?",
+    "Single stats": "Single stats on their own", "Not tested yet": "Not tested yet",
+}
+PROFILE_COLUMNS = [  # (column in the workbook, heading on the page)
+    ("Points %", "Points %"), ("Goal difference per game", "Goal diff."), ("Corsi (shot-attempt share)", "Corsi"),
+    ("Shots-on-goal share", "Shots share"), ("Shooting %", "Shooting %"), ("Save % (raw)", "Save %"),
+    ("PDO", "PDO"), ("Hits per game", "Hits"), ("Power-play %", "PP %"), ("Penalty-kill %", "PK %"),
+]
+
+
+def read_contender(path):
+    """Read the sheets this page needs from the workbook."""
+    note = str(pd.read_excel(path, sheet_name="Right now", header=None, nrows=1).iloc[0, 0])
+    score = pd.read_excel(path, sheet_name="Scorecard")
+    return {
+        "note": note,
+        "right": pd.read_excel(path, sheet_name="Right now", header=1),
+        "verdict": pd.read_excel(path, sheet_name="Verdict"),
+        "score": score[score["Checkpoint"] == "ALL FIVE (average)"],
+        "profile": pd.read_excel(path, sheet_name="Profile"),
+        "rules": pd.read_excel(path, sheet_name="Rule test"),
+    }
+
+
+def right_now_section(right, note, standings):
+    conference = {row["team_name"]: row["conference"] for _, row in standings.iterrows()}
+    match = re.search(r"games through (\d{4}-\d{2}-\d{2})", note)
+    through = nice_date(match.group(1)) if match else "the latest games"
+
+    head = [
+        ("#", "num", "ascending", "Fit rank: where the team ranks on contender fit"),
+        ("Team", "text", "ascending", "Team, with the main reasons for its rating"),
+        ("Fit", "num", None, "The model's estimate that the team ends up one of the four conference finalists"),
+        ("P%", "num", None, "Points percentage"),
+        ("P% rank", "num", "ascending", "Rank in the league by points percentage, for comparison"),
+        ("GP", "num", None, "Games played"),
+    ]
+    th = "".join(
+        f'<th class="{"left" if label == "Team" else ""}" data-sort="{kind}"'
+        f'{f" data-first={chr(34)}{first}{chr(34)}" if first else ""} title="{esc(tip)}" scope="col">'
+        f'<button type="button">{esc(label)}</button></th>' for label, kind, first, tip in head)
+
+    rows = []
+    for _, t in right.iterrows():
+        rows.append(
+            f'<tr data-conf="{esc(conference.get(t["Team"], ""))}">'
+            f'<td data-v="{int(t["Rank"])}">{int(t["Rank"])}</td>'
+            f'<td class="who left" data-v="{esc(t["Team"])}"><strong>{esc(t["Team"])}</strong>'
+            f'<span class="why">{esc(t["Why"])}</span></td>'
+            f'<td class="pts" data-v="{float(t["Final-four chance (model)"])}">{float(t["Final-four chance (model)"]):.0f}%</td>'
+            f'<td data-v="{float(t["Points %"])}">{fmt_pct(t["Points %"])}</td>'
+            f'<td data-v="{int(t["Rank by points %"])}">{int(t["Rank by points %"])}</td>'
+            f'<td data-v="{int(t["Games played"])}">{int(t["Games played"])}</td>'
+            f'</tr>')
+    return f"""
+<h2>Right now <span class="note">&middot; games through {esc(through)}</span></h2>
+<p class="note">Ranked by the model's estimate that each team ends up one of the four conference finalists. Because there are four
+spots, the 32 percentages add up to 400%. Click a heading to sort; compare the Fit rank with the points rank to see where
+the model disagrees with the standings.</p>
+<div class="chips" data-filter-group="fit-table" role="group" aria-label="Filter teams">
+  <button type="button" data-filter="all" aria-pressed="true">League</button>
+  <button type="button" data-filter="Eastern" aria-pressed="false">Eastern</button>
+  <button type="button" data-filter="Western" aria-pressed="false">Western</button>
+</div>
+<div class="table-wrap">
+<table class="sortable" id="fit-table">
+<thead><tr>{th}</tr></thead>
+<tbody>
+{chr(10).join(rows)}
+</tbody>
+</table>
+</div>"""
+
+
+def verdict_section(verdict, score):
+    items = []
+    for _, row in verdict.iterrows():
+        key = str(row.iloc[0])
+        if key == "Question":
+            continue
+        items.append(f"<dt>{esc(VERDICT_LABELS.get(key, key))}</dt><dd>{esc(row.iloc[1])}</dd>")
+
+    body = []
+    for _, s in score.iterrows():
+        body.append(
+            f"<tr><td class='who left'>{esc(s['Method'])}</td><td>{s['AUC']:.3f}</td>"
+            f"<td>{s['Avg rank of final-four teams']:.1f}</td><td>{s['Final-four teams in top 8']:.0%}</td>"
+            f"<td class='{'pos' if s['Gain vs points % (AUC)'] > 0.005 else 'neg' if s['Gain vs points % (AUC)'] < -0.005 else ''}'>"
+            f"{s['Gain vs points % (AUC)']:+.3f}</td></tr>")
+    return f"""
+<h2>Does it work?</h2>
+<p>The honest test: for each past season the score is built from the <em>other</em> seasons, then used to rank that
+season's teams, and we look at where the four real conference finalists landed. The benchmark is simply ranking by points %.</p>
+<dl class="verdict">{''.join(items)}</dl>
+<div class="table-wrap">
+<table>
+<thead><tr><th class="left" scope="col">Ranking method</th><th scope="col" title="1.0 = every finalist ranked above every non-finalist; 0.5 = a coin flip">AUC</th>
+<th scope="col" title="Lower is better; a random list averages about 16">Avg rank of the 4 finalists</th>
+<th scope="col">Finalists in top 8</th><th scope="col" title="Change in AUC against ranking by points %">Gain vs points %</th></tr></thead>
+<tbody>{''.join(body)}</tbody>
+</table>
+</div>
+<p class="note">Averages over five checkpoints (Nov 1, Thanksgiving, Jan 1, trade deadline, end of season) and 15 seasons from 2009-10,
+leaving out the 2019-20 and 2020-21 seasons. AUC: 1.0 is perfect, 0.5 is a coin flip. Only games up to each date are used.</p>"""
+
+
+def profile_section(profile):
+    head = "".join(f'<th scope="col">{esc(label)}</th>' for _, label in PROFILE_COLUMNS)
+    rows = []
+    for _, r in profile.iterrows():
+        cells = "".join(
+            f'<td class="heat" style="--p:{float(r[col]):.0f}">{float(r[col]):.0f}</td>' for col, _ in PROFILE_COLUMNS)
+        bold = " style='font-weight:700'" if r["How the season ended"] == "ALL teams" else ""
+        rows.append(f"<tr><td class='left'{bold}>{esc(r['How the season ended'])}</td><td>{int(r['Team-seasons'])}</td>{cells}</tr>")
+    return f"""
+<h2>What champions looked like</h2>
+<p>How each group of teams ranked in the league at the end of the regular season, on average (100 = best in the league that
+season, 50 = average). Darker means higher. 15 seasons, 2009-10 on.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th class="left" scope="col">How the season ended</th><th scope="col">Teams</th>{head}</tr></thead>
+<tbody>{''.join(rows)}</tbody>
+</table>
+</div>
+<p class="note">Champions and finalists were strong on results and on shot-attempt share (Corsi) and ordinary on hits.
+PDO is shooting % plus save %, a common luck meter: the champions ran a little hot.</p>"""
+
+
+def rules_section(rules):
+    rows = []
+    for _, r in rules.iterrows():
+        rows.append(
+            f"<tr><td class='who left'>{esc(r['Rule'])}</td><td>{int(r['Teams meeting the rule'])}</td>"
+            f"<td>{int(r['Champions among them'])}</td><td>{r['Share of champions that met it']:.0%}</td>"
+            f"<td>{r['Champion rate for such teams']:.0%}</td><td>{r['Lift over a random team']:.1f}x</td></tr>")
+    return f"""
+<h2>Is "top 5 in most of the factors" a rule for finding the champion?</h2>
+<p>A popular idea: champions are usually near the top of the league in several key areas, so teams that match should be
+favorites. The four areas here are record, goal difference, Corsi and the power kill (power-play % plus penalty-kill %).
+A random team wins the Cup about 3% of the time (1 in 31).</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th class="left" scope="col">Rule (end of regular season)</th><th scope="col">Teams that met it</th>
+<th scope="col">Champions among them</th><th scope="col" title="How many of the 15 champions met the rule">Champions that met it</th>
+<th scope="col" title="Champions divided by teams that met the rule">Champion rate</th><th scope="col" title="Champion rate divided by the 3% base rate">Lift</th></tr></thead>
+<tbody>{''.join(rows)}</tbody>
+</table>
+</div>
+<p class="note">Such teams do win more often than a random team, but most champions do not meet the bar, and most teams that
+do meet it do not win. It narrows the field; it does not find the winner.</p>"""
+
+
+def contender_page(data, standings, built_text):
+    body = f"""
+<h1>Contender fit</h1>
+<p class="lead">How closely does each team's season so far look like the seasons of teams that went on to reach the conference finals?</p>
+<p class="note">Version 1, built from NHL team statistics for 15 past seasons. It is an estimate from past patterns,
+not a prediction of who will win the Cup, and not odds or a betting line. The next versions will add shot quality,
+zone time and goaltending in context.</p>
+{right_now_section(data["right"], data["note"], standings)}
+{verdict_section(data["verdict"], data["score"])}
+{profile_section(data["profile"])}
+{rules_section(data["rules"])}
+<h2>What this does not know yet</h2>
+<ul>
+  <li>How dangerous a team's shots are (slot and high-danger shots), and how much of the goalie's results come from the defense in front of him.</li>
+  <li>How much of the game a team spends in the offensive zone, and how cleanly it breaks out.</li>
+  <li>Depth: a top-line center, an elite defense pair, or a goalie who gets hot in the playoffs.</li>
+</ul>
+<p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL.
+Shot-quality data from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a> will be credited here when it is added.</p>
+"""
+    return page("Contender fit - " + SITE_NAME, "contender", body, built_text)
+
+
+# ----------------------------------------------------------------------------
 # main() is where the script starts.
 # ----------------------------------------------------------------------------
 def main():
@@ -293,6 +479,11 @@ def main():
         "index.html": home_page(schedule, standings, built_text),
         "about.html": about_page(built_text),
     }
+    if CONTENDER_FILE.exists():
+        pages["contender-fit.html"] = contender_page(read_contender(CONTENDER_FILE), standings, built_text)
+    else:
+        print("Skipping the Contender fit page: outputs/contender_fit.xlsx not found.")
+        print("  (run python scripts/build_contender_fit.py first; the existing page in docs/ is left as it is)")
     for name, content in pages.items():
         (SITE_FOLDER / name).write_text(content, encoding="utf-8")
         print(f"Wrote docs/{name}  ({len(content):,} characters)")

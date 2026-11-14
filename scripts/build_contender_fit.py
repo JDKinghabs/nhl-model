@@ -437,7 +437,11 @@ def right_now(connection, tables, games_all, seasons_all, best_model):
 
     features = MODELS[best_model]
     cols = [f"z_{f}" for f in features]
-    train = tables["nov1"]                                     # early-season model: the closest to 'right now'
+    # Use the model built for the checkpoint closest to 'right now' (by games played): Nov 1 is about 11
+    # games in, Thanksgiving about 21, Jan 1 about 38, the deadline about 63.
+    median_gp = int(now["gp"].median())
+    checkpoint = min(tables, key=lambda cp: abs(float(tables[cp]["gp"].median()) - median_gp))
+    train = tables[checkpoint]
     beta = fit_logistic(train[cols].to_numpy(), train["conf_finalist"].to_numpy(dtype=float))
     beta = calibrate_intercept(beta, now[cols].to_numpy(), total=4.0)     # four final-four spots to hand out
     now["chance"] = predict_logistic(beta, now[cols].to_numpy())
@@ -472,7 +476,7 @@ def right_now(connection, tables, games_all, seasons_all, best_model):
         "Corsi": (now["corsi"] * 100).round(1), "PP%": (now["pp_pct"] * 100).round(1), "PK%": (now["pk_pct"] * 100).round(1),
         "Final-four chance (model)": (now["chance"] * 100).round(1), "Why": now["Why"]})
     out["Rank by points %"] = now["pts_pct"].rank(ascending=False, method="min").astype(int).to_numpy()
-    return out, current, int(now["gp"].median())
+    return out, current, median_gp, checkpoint, str(cur_games["game_date"].max())
 
 
 # ----------------------------------------------------------------------------
@@ -545,7 +549,7 @@ def main():
     print(f"\nBest model: {best_model}. Vs points %: better in {wins} season-checkpoints, worse in {losses} "
           f"(out of {n_seasons * len(CHECKPOINTS)}).")
 
-    right, current, median_gp = right_now(connection, tables, games_raw, seasons, best_model)
+    right, current, median_gp, used_checkpoint, through = right_now(connection, tables, games_raw, seasons, best_model)
     connection.close()
 
     cp_table = summary.copy()
@@ -576,9 +580,10 @@ def main():
         "Right now": right,
         "Scores": scores_out,
     }
-    notes = {"Right now": (f"Season {str(current)[:4]}-{str(current)[6:]}: median {median_gp} games played. Scored with "
-                           f"'{best_model}', built on the early-season (Nov 1) pattern of 15 finished seasons, with chances "
-                           f"adjusted to add up to the four final-four spots. A rough guide to final-four fit, not a Cup prediction."),
+    notes = {"Right now": (f"Season {str(current)[:4]}-{str(current)[6:]}: games through {through} (median {median_gp} played). Scored with "
+                           f"'{best_model}', built on the {PLAIN_CP[used_checkpoint]} pattern of 15 finished seasons (the checkpoint "
+                           f"closest to now), with chances adjusted to add up to the four final-four spots. "
+                           f"A rough guide to final-four fit, not a Cup prediction."),
              "Weights": ("What each model rewards, in steps above/below the league average. Record and goal difference move together, "
                          "so their weights partly cancel (one can look negative): read the two as a pair."),
              "Calibration": (f"Honesty check for '{best_model}': when it said X%, how often was the team really one of the four? "
