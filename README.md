@@ -94,6 +94,29 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    ```
    The workbook is `outputs/slow_starters.xlsx`: start with its "Verdict" sheet.
 
+## Downloading the MoneyPuck files (by hand)
+
+MoneyPuck does not allow scripts to download its files, so you click the links yourself in your browser
+(free for non-commercial use; credit MoneyPuck.com wherever the data is shown). On
+<https://moneypuck.com/data.htm>, in the **Season Level Data** table, download the file under:
+
+| Row | Click the icon under | What it is |
+|---|---|---|
+| All Previous Seasons Combined | Team Level, Goalies | team and goalie seasons 2008-09 to 2024-25 (two zip files) |
+| 2025-2026 | Team Level, Goalies | last season (two csv files) |
+| 2026-2027 | Team Level, Goalies | this season so far (two csv files; re-download to refresh) |
+
+Also download the text link **here** under *Game By Game Level Data* (`all_teams.csv`, every team's every game)
+and the **data dictionary** link at the top of the page. Your browser saves them in your Downloads folder (with
+names like `teams (1).csv`: that is fine). Then run:
+
+```
+python scripts/import_moneypuck_downloads.py
+```
+
+It recognizes each file by its contents, copies it into `data/moneypuck/` with a clear name, unzips the zips,
+and prints a checklist of anything still missing. Run it again after each batch of downloads.
+
 ## Data sources and credits
 
 - **NHL**: schedule, standings and statistics come from the NHL's public, unofficial web API. NHL data is © NHL; it is used here for personal, non-commercial purposes. The API is undocumented and can change without notice.
