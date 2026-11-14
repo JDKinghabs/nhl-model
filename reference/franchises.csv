@@ -1,0 +1,37 @@
+﻿team_id,team_name,first_season,last_season,franchise_id,franchise_name,note
+1,New Jersey Devils,20052006,20262027,1,New Jersey Devils,
+2,New York Islanders,20052006,20262027,2,New York Islanders,
+3,New York Rangers,20052006,20262027,3,New York Rangers,
+4,Philadelphia Flyers,20052006,20262027,4,Philadelphia Flyers,
+5,Pittsburgh Penguins,20052006,20262027,5,Pittsburgh Penguins,
+6,Boston Bruins,20052006,20262027,6,Boston Bruins,
+7,Buffalo Sabres,20052006,20262027,7,Buffalo Sabres,
+8,Montréal Canadiens,20052006,20262027,8,Montréal Canadiens,
+9,Ottawa Senators,20052006,20262027,9,Ottawa Senators,
+10,Toronto Maple Leafs,20052006,20262027,10,Toronto Maple Leafs,
+12,Carolina Hurricanes,20052006,20262027,12,Carolina Hurricanes,
+13,Florida Panthers,20052006,20262027,13,Florida Panthers,
+14,Tampa Bay Lightning,20052006,20262027,14,Tampa Bay Lightning,
+15,Washington Capitals,20052006,20262027,15,Washington Capitals,
+16,Chicago Blackhawks,20052006,20262027,16,Chicago Blackhawks,
+17,Detroit Red Wings,20052006,20262027,17,Detroit Red Wings,
+18,Nashville Predators,20052006,20262027,18,Nashville Predators,
+19,St. Louis Blues,20052006,20262027,19,St. Louis Blues,
+20,Calgary Flames,20052006,20262027,20,Calgary Flames,
+21,Colorado Avalanche,20052006,20262027,21,Colorado Avalanche,
+22,Edmonton Oilers,20052006,20262027,22,Edmonton Oilers,
+23,Vancouver Canucks,20052006,20262027,23,Vancouver Canucks,
+24,Anaheim Ducks,20052006,20262027,24,Anaheim Ducks,
+25,Dallas Stars,20052006,20262027,25,Dallas Stars,
+26,Los Angeles Kings,20052006,20262027,26,Los Angeles Kings,
+28,San Jose Sharks,20052006,20262027,28,San Jose Sharks,
+29,Columbus Blue Jackets,20052006,20262027,29,Columbus Blue Jackets,
+30,Minnesota Wild,20052006,20262027,30,Minnesota Wild,
+11,Atlanta Thrashers,20052006,20102011,52,Winnipeg Jets,Atlanta Thrashers moved to Winnipeg in 2011 (Winnipeg has a new team id)
+52,Winnipeg Jets,20112012,20262027,52,Winnipeg Jets,Winnipeg Jets (2011 on) = the old Atlanta Thrashers franchise
+54,Vegas Golden Knights,20172018,20262027,54,Vegas Golden Knights,
+55,Seattle Kraken,20212022,20262027,55,Seattle Kraken,
+27,Phoenix Coyotes,20052006,20132014,68,Utah Mammoth,Phoenix Coyotes became the Arizona Coyotes in 2014 (new team id)
+53,Arizona Coyotes,20142015,20232024,68,Utah Mammoth,Arizona Coyotes: the NHL treats Utah as a new team that inherited the players and staff; grouped here for continuity
+59,Utah Hockey Club,20242025,20242025,68,Utah Mammoth,Utah Hockey Club (2024-25 only) renamed Utah Mammoth
+68,Utah Mammoth,20252026,20262027,68,Utah Mammoth,Utah Mammoth: grouped with Phoenix/Arizona for continuity of players and staff

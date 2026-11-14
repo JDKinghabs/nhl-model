@@ -38,6 +38,19 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    python scripts/build_coverage_report.py
    ```
    The report is `outputs/data_coverage.xlsx`: start with its "Key metrics" sheet.
+4. Download every team's result in every game (about 6 minutes), work out the checkpoint dates
+   (Nov 1, Thanksgiving, Jan 1, trade deadline, end of season) and the standings on each, load it all
+   into one database file (`data/nhl.db`), and build a workbook showing who was in a playoff spot at
+   each checkpoint and whether they made it:
+   ```
+   python scripts/pull_game_results.py
+   python scripts/build_checkpoints.py
+   python scripts/build_database.py
+   python scripts/build_checkpoint_report.py
+   ```
+   The workbook is `outputs/checkpoint_standings.xlsx`: start with its "First look" sheet.
+   `reference/trade_deadlines.csv` and `reference/franchises.csv` are small hand-checked lists you can
+   edit in Excel. Some deadline dates are marked "from memory - please check".
 
 ## Data sources and credits
 
