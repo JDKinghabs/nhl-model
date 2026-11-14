@@ -77,6 +77,14 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    python scripts/build_contender_fit.py
    ```
    The workbook is `outputs/contender_fit.xlsx`: start with its "Verdict" sheet.
+7. Test six red flags (running hot, weak shot share, record flatters goals, weak special teams, penalty
+   trouble, cold lately) on teams that were in a playoff spot: do flagged teams miss the playoffs more often
+   than equally safe teams, and does stacking flags raise the risk? Also lists today's in-spot teams with
+   their flags (this asks the NHL for one standings page):
+   ```
+   python scripts/build_red_flags.py
+   ```
+   The workbook is `outputs/red_flags.xlsx`: start with its "Verdict" sheet.
 
 ## Data sources and credits
 
