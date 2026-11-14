@@ -229,6 +229,9 @@ def main():
 
     run_checks(team_games, games)
     connection.close()
+    if (PROJECT_FOLDER / "data" / "moneypuck").exists() and any((PROJECT_FOLDER / "data" / "moneypuck").glob("*.csv")):
+        print("\nNote: this rebuild starts the database from scratch, so the MoneyPuck tables are gone.")
+        print("      Run  python scripts/load_moneypuck.py  to add them back.")
     print("\nData: (c) NHL")
     return 0
 

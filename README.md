@@ -115,7 +115,14 @@ python scripts/import_moneypuck_downloads.py
 ```
 
 It recognizes each file by its contents, copies it into `data/moneypuck/` with a clear name, unzips the zips,
-and prints a checklist of anything still missing. Run it again after each batch of downloads.
+and prints a checklist of anything still missing. Run it again after each batch of downloads. Then add the
+MoneyPuck tables to the database and check them against the NHL's numbers (goals, 5v5 goals, shot attempts):
+
+```
+python scripts/load_moneypuck.py
+```
+
+(`build_database.py` rebuilds the database from scratch, so run `load_moneypuck.py` again after it.)
 
 ## Data sources and credits
 
