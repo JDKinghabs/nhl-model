@@ -115,6 +115,23 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     ```
     The workbook is `outputs/contender_fit_v2.xlsx`: start with its "Verdict" sheet.
 
+## The play-by-play download (overnight)
+
+Every NHL game has a play-by-play: one row per event (faceoff, shot, hit, giveaway, takeaway, penalty, goal) with the
+time, the players and, for most events, where on the ice it happened and in which zone. This feeds the zone-time and
+breakout estimates and a shot-location definition of our own. It is about 22,000 games at one request a second
+(roughly 6 hours), so it is built to run unattended:
+
+```
+python scripts/pull_play_by_play.py            start (or resume) the download
+python scripts/pull_play_by_play.py --status   how far along is it, and when will it finish?
+```
+
+It saves into one database file (`data/pbp.db`, about 1-2 GB, never uploaded), skips games it already has, goes
+newest seasons first, backs off if the NHL starts refusing, and asks Windows not to sleep while it runs (closing a
+laptop lid still sleeps the PC). To stop cleanly, create an empty file named `STOP` in `data/pbp/`; to start again,
+just run the command again.
+
 ## Downloading the MoneyPuck files (by hand)
 
 MoneyPuck does not allow scripts to download its files, so you click the links yourself in your browser
