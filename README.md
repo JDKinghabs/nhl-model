@@ -29,6 +29,15 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
 2. Run the scripts in `scripts/` (each one explains itself at the top of the file). For example,
    `python scripts/build_reference_tables.py` builds `outputs/playoff_history.xlsx`: every playoff
    series, champion and conference finalist since 2005-06, and how far every team went each season.
+3. Download every team's season statistics (about 11 minutes, it waits politely between requests),
+   the NHL's tracking-based zone time (2021-22 on), and build a data coverage report that shows
+   which statistic is really available from which season:
+   ```
+   python scripts/pull_team_season_reports.py
+   python scripts/pull_edge_zone_time.py
+   python scripts/build_coverage_report.py
+   ```
+   The report is `outputs/data_coverage.xlsx`: start with its "Key metrics" sheet.
 
 ## Data sources and credits
 
