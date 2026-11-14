@@ -93,6 +93,14 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
    python scripts/build_slow_starters.py
    ```
    The workbook is `outputs/slow_starters.xlsx`: start with its "Verdict" sheet.
+9. Goaltending in context (needs the MoneyPuck tables from `load_moneypuck.py`): splits each team's goals
+   against into defense (shot quality allowed) and goaltending (goals saved above expected), labels teams
+   "goalie bailing out the defense" / "defense let down by the goalie", tests which part repeats and whether the
+   labels predict the rest of the season, and asks whether anything foresees a hot playoff goalie:
+   ```
+   python scripts/build_goaltending_study.py
+   ```
+   The workbook is `outputs/goaltending_in_context.xlsx`: start with its "Verdict" sheet.
 
 ## Downloading the MoneyPuck files (by hand)
 
