@@ -43,6 +43,30 @@
     });
   });
 
+  // 4) Rule rows that open a panel under the table ("which teams fit this rule right now"). One panel open at a time.
+  var ruleButtons = document.querySelectorAll('button.rule-toggle');
+  ruleButtons.forEach(function (button) {
+    var row = button.closest('tr');
+    function toggle() {
+      var panel = document.getElementById(button.getAttribute('data-panel'));
+      var wasOpen = button.getAttribute('aria-expanded') === 'true';
+      ruleButtons.forEach(function (other) {                       // close everything first
+        other.setAttribute('aria-expanded', 'false');
+        other.closest('tr').classList.remove('open');
+        var otherPanel = document.getElementById(other.getAttribute('data-panel'));
+        if (otherPanel) otherPanel.hidden = true;
+      });
+      if (!wasOpen && panel) {                                    // then open this one (clicking an open row closes it)
+        button.setAttribute('aria-expanded', 'true');
+        row.classList.add('open');
+        panel.hidden = false;
+        if (panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+    button.addEventListener('click', function (event) { event.stopPropagation(); toggle(); });
+    row.addEventListener('click', toggle);                        // clicking anywhere on the row works too
+  });
+
   // 3) Filter buttons (All / Eastern / Western) above a table.
   document.querySelectorAll('[data-filter-group]').forEach(function (group) {
     var table = document.getElementById(group.getAttribute('data-filter-group'));

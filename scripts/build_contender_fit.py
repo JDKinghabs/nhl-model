@@ -476,7 +476,17 @@ def right_now(connection, tables, games_all, seasons_all, best_model):
         "Corsi": (now["corsi"] * 100).round(1), "PP%": (now["pp_pct"] * 100).round(1), "PK%": (now["pk_pct"] * 100).round(1),
         "Final-four chance (model)": (now["chance"] * 100).round(1), "Why": now["Why"]})
     out["Rank by points %"] = now["pts_pct"].rank(ascending=False, method="min").astype(int).to_numpy()
-    return out, current, median_gp, checkpoint, str(cur_games["game_date"].max())
+
+    # Today's rank on each of the four rule-test factors (record, goal difference, Corsi, power kill), so the website
+    # can show which teams fit each "top N in K of 4 factors" bucket right now and why.
+    rank = lambda col: now[col].rank(ascending=False, method="min").astype(int)          # noqa: E731
+    factors = pd.DataFrame({
+        "Team": now["team"], "Games played": now["gp"],
+        "Points %": now["pts_pct"].round(3), "Record rank": rank("z_pts_pct"),
+        "Goal difference / game": now["gd"].round(2), "Goal difference rank": rank("z_gd"),
+        "Corsi %": (now["corsi"] * 100).round(1), "Corsi rank": rank("z_corsi"),
+        "PP%": (now["pp_pct"] * 100).round(1), "PK%": (now["pk_pct"] * 100).round(1), "Power kill rank": rank("z_power_kill")})
+    return out, factors, current, median_gp, checkpoint, str(cur_games["game_date"].max())
 
 
 # ----------------------------------------------------------------------------
@@ -549,7 +559,7 @@ def main():
     print(f"\nBest model: {best_model}. Vs points %: better in {wins} season-checkpoints, worse in {losses} "
           f"(out of {n_seasons * len(CHECKPOINTS)}).")
 
-    right, current, median_gp, used_checkpoint, through = right_now(connection, tables, games_raw, seasons, best_model)
+    right, factors, current, median_gp, used_checkpoint, through = right_now(connection, tables, games_raw, seasons, best_model)
     connection.close()
 
     cp_table = summary.copy()
@@ -578,12 +588,15 @@ def main():
         "Profile": profile(end),
         "Rule test": rule_test(end).round(3),
         "Right now": right,
+        "Factors now": factors.sort_values("Record rank").reset_index(drop=True),
         "Scores": scores_out,
     }
     notes = {"Right now": (f"Season {str(current)[:4]}-{str(current)[6:]}: games through {through} (median {median_gp} played). Scored with "
                            f"'{best_model}', built on the {PLAIN_CP[used_checkpoint]} pattern of 15 finished seasons (the checkpoint "
                            f"closest to now), with chances adjusted to add up to the four final-four spots. "
                            f"A rough guide to final-four fit, not a Cup prediction."),
+             "Factors now": (f"Games through {through}: every team's rank (1 = best) on the four factors of the 'top N in K factors' rule test: "
+                             f"record (points %), goal difference, Corsi and the power kill (PP% + PK%)."),
              "Weights": ("What each model rewards, in steps above/below the league average. Record and goal difference move together, "
                          "so their weights partly cancel (one can look negative): read the two as a pair."),
              "Calibration": (f"Honesty check for '{best_model}': when it said X%, how often was the team really one of the four? "

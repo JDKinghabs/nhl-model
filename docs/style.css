@@ -113,6 +113,21 @@ tbody tr:nth-child(n) td.heat {
   background: color-mix(in srgb, var(--accent) calc(var(--p) * 0.6%), var(--surface));
   text-align: center;
 }
+/* rows that open a list of today's teams */
+tr.rule-row { cursor: pointer; }
+tr.rule-row:hover td { background: var(--accent-soft); }
+table.rules th { white-space: normal; vertical-align: bottom; }
+table.rules td.who { min-width: 250px; }
+button.rule-toggle { font: inherit; font-weight: 600; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; white-space: nowrap; }
+button.rule-toggle::after { content: " \25BE"; font-size: 0.85em; }
+button.rule-toggle[aria-expanded="true"]::after { content: " \25B4"; }
+tr.rule-row.open td { background: var(--accent-soft); }
+.rule-panel { margin-top: 14px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius); }
+.rule-panel h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.rule-panel p { margin: 0 0 8px; }
+.rule-panel .table-wrap { margin-bottom: 8px; }
+.rk { color: var(--muted); font-size: 0.8em; }
+tbody tr:nth-child(n) td.hit { background: var(--accent-soft); font-weight: 700; color: var(--accent); }
 dl.verdict { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; margin: 0 0 20px; }
 dl.verdict dt { font-weight: 700; }
 dl.verdict dd { margin: 0; }

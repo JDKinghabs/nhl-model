@@ -314,14 +314,21 @@ def read_contender(path):
     """Read the sheets this page needs from the workbook."""
     note = str(pd.read_excel(path, sheet_name="Right now", header=None, nrows=1).iloc[0, 0])
     score = pd.read_excel(path, sheet_name="Scorecard")
-    return {
+    data = {
         "note": note,
         "right": pd.read_excel(path, sheet_name="Right now", header=1),
         "verdict": pd.read_excel(path, sheet_name="Verdict"),
         "score": score[score["Checkpoint"] == "ALL FIVE (average)"],
         "profile": pd.read_excel(path, sheet_name="Profile"),
         "rules": pd.read_excel(path, sheet_name="Rule test"),
+        "factors": None,
     }
+    try:                                    # today's rank on each factor (an older workbook may not have this sheet)
+        data["factors"] = pd.read_excel(path, sheet_name="Factors now", header=1)
+    except ValueError:
+        print("  (the contender workbook has no 'Factors now' sheet: the rule table will not be clickable. "
+              "Rerun python scripts/build_contender_fit.py)")
+    return data
 
 
 def right_now_section(right, note, standings):
@@ -428,7 +435,8 @@ season, 50 = average). Darker means higher. 15 seasons, 2009-10 on.</p>
 PDO is shooting % plus save %, a common luck meter: the champions ran a little hot.</p>"""
 
 
-def rules_section(rules):
+def rules_section_plain(rules):
+    """The rule table without the click-to-open team lists (used when today's factor ranks are not in the workbook)."""
     rows = []
     for _, r in rules.iterrows():
         rows.append(
@@ -452,6 +460,82 @@ A random team wins the Cup about 3% of the time (1 in 31).</p>
 do meet it do not win. It narrows the field; it does not find the winner.</p>"""
 
 
+FACTOR_COLUMNS = [  # (heading, how to show the value, rank column in the workbook)
+    ("Record", lambda r: fmt_pct(r["Points %"]), "Record rank"),
+    ("Goal difference", lambda r: f"{r['Goal difference / game']:+.2f} / game", "Goal difference rank"),
+    ("Corsi (5v5)", lambda r: f"{r['Corsi %']:.1f}%", "Corsi rank"),
+    ("Power kill", lambda r: f"PP {r['PP%']:.1f}% / PK {r['PK%']:.1f}%", "Power kill rank"),
+]
+
+
+def rule_detail(factors, top_n, k, through):
+    """The list of teams that fit one 'top N in at least K of 4 factors' rule today, with the stats behind it."""
+    f = factors.copy()
+    f["n_hit"] = sum((f[rank] <= top_n).astype(int) for _, _, rank in FACTOR_COLUMNS)
+    fit = f[f["n_hit"] >= k].sort_values(["n_hit", "Record rank"], ascending=[False, True])
+    near = f[f["n_hit"] == k - 1].sort_values(["Record rank"]) if k > 1 else f.iloc[0:0]
+
+    explain = (f"<p class='note'>Ranks are among all 32 teams, games through {esc(through)}. A highlighted number means the team is in the "
+               f"top {top_n} of the league on that factor. Early in a season ranks move a lot.</p>")
+    if fit.empty:
+        body = f"<p><strong>No team fits this rule right now.</strong></p>"
+    else:
+        head = "".join(f'<th scope="col">{esc(label)}</th>' for label, _, _ in FACTOR_COLUMNS)
+        rows = []
+        for _, r in fit.iterrows():
+            cells = "".join(
+                f'<td class="{"hit" if r[rank] <= top_n else ""}">{esc(show(r))} <span class="rk">#{int(r[rank])}</span></td>'
+                for _, show, rank in FACTOR_COLUMNS)
+            rows.append(f'<tr><td class="who left"><strong>{esc(r["Team"])}</strong></td>{cells}<td>{int(r["n_hit"])} of 4</td></tr>')
+        body = (f"<p><strong>{len(fit)} team{'s' if len(fit) != 1 else ''} fit{'s' if len(fit) == 1 else ''} this rule right now:</strong></p>"
+                f'<div class="table-wrap"><table><thead><tr><th class="left" scope="col">Team</th>{head}<th scope="col">Factors in the top {top_n}</th></tr></thead>'
+                f"<tbody>{''.join(rows)}</tbody></table></div>")
+    if len(near):
+        short = {"Record": "record", "Goal difference": "goal difference", "Corsi (5v5)": "Corsi", "Power kill": "power kill"}
+        shown = [f"{r['Team']} (top {top_n} in: " + ", ".join(short[label] for label, _, rank in FACTOR_COLUMNS if r[rank] <= top_n) + ")"
+                 for _, r in near.head(8).iterrows()]
+        more = f" and {len(near) - 8} more" if len(near) > 8 else ""
+        body += f"<p class='note'>One factor short: {esc('; '.join(shown))}{more}.</p>"
+    return explain + body
+
+
+def rules_section(rules, factors, through):
+    if factors is None:
+        return rules_section_plain(rules)
+    rows, panels = [], []
+    for i, (_, r) in enumerate(rules.iterrows()):
+        match = re.match(r"Top (\d+) in at least (\d+) of (\d+) factors", str(r["Rule"]))
+        top_n, k = int(match.group(1)), int(match.group(2))
+        n_fit = int(sum((factors[rank] <= top_n).astype(int) for _, _, rank in FACTOR_COLUMNS).ge(k).sum())
+        rows.append(
+            f"<tr class='rule-row'><td class='who left'><button type='button' class='rule-toggle' aria-expanded='false' "
+            f"aria-controls='rule-panel-{i}' data-panel='rule-panel-{i}'>{esc(r['Rule'])}</button></td>"
+            f"<td>{int(r['Teams meeting the rule'])}</td><td>{int(r['Champions among them'])}</td><td>{r['Share of champions that met it']:.0%}</td>"
+            f"<td>{r['Champion rate for such teams']:.0%}</td><td>{r['Lift over a random team']:.1f}x</td>"
+            f"<td class='pts' data-v='{n_fit}'>{n_fit}</td></tr>")
+        panels.append(
+            f"<div class='rule-panel' id='rule-panel-{i}' hidden><h3>Teams that fit &ldquo;{esc(r['Rule'])}&rdquo; right now</h3>"
+            f"{rule_detail(factors, top_n, k, through)}</div>")
+    return f"""
+<h2>Is "top 5 in most of the factors" a rule for finding the champion?</h2>
+<p>A popular idea: champions are usually near the top of the league in several key areas, so teams that match should be
+favorites. The four areas here are record (points %), goal difference, Corsi (shot-attempt share at 5-on-5) and the power kill
+(power-play % plus penalty-kill %). A random team wins the Cup about 3% of the time (1 in 31).</p>
+<p class="note"><strong>Click a rule</strong> to see which of today's teams fit it, and the numbers behind it.</p>
+<div class="table-wrap">
+<table class="rules">
+<thead><tr><th class="left" scope="col">Rule (end of regular season)</th><th scope="col">Teams that met it</th>
+<th scope="col">Champions among them</th><th scope="col" title="How many of the 15 champions met the rule">Champions that met it</th>
+<th scope="col" title="Champions divided by teams that met the rule">Champion rate</th><th scope="col" title="Champion rate divided by the 3% base rate">Lift</th>
+<th scope="col" title="How many of today's teams fit the rule (games through {esc(through)})">Fit right now</th></tr></thead>
+<tbody>{''.join(rows)}</tbody>
+</table>
+</div>
+<div class="rule-panels" aria-live="polite">{''.join(panels)}</div>
+<p class="note">Such teams do win more often than a random team, but most champions do not meet the bar, and most teams that
+do meet it do not win. It narrows the field; it does not find the winner.</p>"""
+
+
 def contender_page(data, standings, built_text):
     body = f"""
 <h1>Contender fit</h1>
@@ -462,7 +546,7 @@ zone time and goaltending in context.</p>
 {right_now_section(data["right"], data["note"], standings)}
 {verdict_section(data["verdict"], data["score"])}
 {profile_section(data["profile"])}
-{rules_section(data["rules"])}
+{rules_section(data["rules"], data.get("factors"), through_text(data["note"]))}
 <h2>What this does not know yet</h2>
 <ul>
   <li>How dangerous a team's shots are (slot and high-danger shots), and how much of the goalie's results come from the defense in front of him.</li>
