@@ -27,6 +27,28 @@ WHAT IT DOES (in Excel terms):
     THE INDEX: each stat is converted to "how far above or below the league average that season" (like a z-score,
     flipped so higher is always better), then the three are averaged with equal weight.
 
+    FIVE MORE CANDIDATE STATS (not in the index: each has to earn its place):
+
+      4. ICINGS             Icings per 60 minutes. The team that iced the puck is the one with the next faceoff in
+                            its own end. LOWER IS BETTER.
+      5. PINNED-IN SPELLS   Times the opponent gets two or more shot attempts in a row from inside your zone, each
+                            within 30 seconds of the last, with no stoppage and no event outside your zone in between.
+                            Per 60 minutes. LOWER IS BETTER.
+      6. OWN-ZONE TURNOVERS Your own-zone giveaways plus the pucks the opponent took off you in your end (their
+                            takeaways), per 60 minutes. LOWER IS BETTER.
+      7. DEFENCE TO OFFENCE Share of own-zone puck wins (defensive-zone faceoff win, takeaway, blocked shot, opponent's
+                            missed shot) that become your own shot attempt within 20 seconds, before play stops.
+                            HIGHER IS BETTER.
+      8. TRANSITION SHOT    Of your unblocked transition shots, the share taken from the slot (between the faceoff
+         QUALITY            dots, from the goal line out to the top of the circles). HIGHER IS BETTER.
+
+    THE PASS RULE (written down before any result was looked at). A stat earns a place only if all three hold:
+      1. it repeats: the full-season estimate from odd vs even games is 0.50 or more;
+      2. it points the right way: its link with goal difference in the same season is positive;
+      3. it adds something beyond Corsi out of sample: built from one half of a season's games, its link with the
+         results of the OTHER half, after taking out Corsi, is above zero by more than its noise margin.
+    With eight stats tested, one narrow pass can still be luck: read a pass as "worth keeping an eye on", not proof.
+
     THE TESTS:
       * REPEATS?    does a team's number from odd-numbered games match its number from even-numbered games?
       * LINKS?      how does it line up with points %, goal difference, shot-attempt share (Corsi), expected goals,
@@ -98,6 +120,28 @@ SHORT_NAMES = ["Zone exit time", "Costly giveaways", "Transition shots"]
 # They are rescaled to add up to 1. Change them here, or for one run with  --weights 0.5,0.2,0.3
 WEIGHTS = (1 / 3, 1 / 3, 1 / 3)
 WEIGHT_STEP = 0.1        # the weight test tries every mix of the three weights in steps of this size
+
+# ---- Five more candidate stats (not in the index yet: each has to earn its place, see PASS RULE below) ----
+PINNED_GAP = 30          # seconds: opponent shot attempts this close together, with play never leaving the zone, are one "pinned-in spell"
+D2O_WINDOW = 20          # seconds from an own-zone puck win to the team's own shot attempt for it to count as "defence to offence"
+SLOT_HALF_WIDTH = 22     # feet either side of the middle of the ice (the faceoff dots are 22 feet out)
+SLOT_DEPTH = 35          # feet out from the goal line (the top of the faceoff circles)
+GOAL_LINE_X = 89         # the goal line is 89 feet from centre ice in the NHL's coordinates
+CANDIDATES = [  # (column, plain name, higher is better?)
+    ("icing_pg", "Icings per 60 (lower is better)", False),
+    ("pinned_pg", "Pinned-in spells per 60 (lower is better)", False),
+    ("turnover_pg", "Own-zone turnovers per 60: giveaways + pucks taken off you (lower is better)", False),
+    ("d2o_rate", "Defence-to-offence rate: own-zone puck wins that become your shot attempt (higher is better)", True),
+    ("trans_slot_share", "Transition shot quality: share from the slot (higher is better)", True),
+]
+ALL_STATS = COMPONENTS + CANDIDATES
+ALL_Z = [f"z_{c}" for c, _, _ in ALL_STATS]
+# PASS RULE, fixed before any result was looked at. A stat earns a place only if ALL THREE hold:
+#   1. it repeats: the full-season estimate from odd vs even games is 0.50 or more;
+#   2. it points the right way: its plain link with goal difference in the same season is positive;
+#   3. it adds something beyond Corsi out of sample: built from one half of a season's games, its link with the RESULTS of the
+#      other half (average of points % and goal difference), after taking out Corsi, is above zero by more than its noise margin.
+PASS_REPEAT = 0.50
 CP_ORDER = cf.CHECKPOINTS
 PLAIN_CP = cf.PLAIN_CP
 OUTCOME_ORDER = cf.OUTCOME_ORDER
@@ -113,6 +157,17 @@ READ_ME = [
     f"  Transition shots    A shot attempt within {TRANSITION_WINDOW} seconds of an event outside the offensive zone, while play was in motion (not right after a faceoff",
     "                      or stoppage), per 60 minutes. Higher is better.",
     "  Breakout Index      Each stat becomes 'steps above or below the league average that season' (flipped so higher is always better); the three are averaged.",
+    "",
+    "FIVE MORE CANDIDATE STATS (sheet 'New stats'; not in the index, each has to earn its place)",
+    "  Icings               Icings per 60 minutes; the team that iced the puck is the one with the next faceoff in its own end. Lower is better.",
+    f"  Pinned-in spells     Times the opponent gets 2+ shot attempts in a row from inside your zone, each within {PINNED_GAP} seconds of the last, with no stoppage and",
+    "                       no event outside your zone in between. Per 60 minutes. Lower is better.",
+    "  Own-zone turnovers   Your own-zone giveaways plus the pucks the opponent took off you in your end, per 60 minutes. Lower is better.",
+    f"  Defence to offence   Share of own-zone puck wins (faceoff win, takeaway, blocked shot, opponent's missed shot) that become your own shot attempt within {D2O_WINDOW} seconds.",
+    "  Transition shot quality   Of your unblocked transition shots, the share from the slot (between the faceoff dots, goal line to the top of the circles).",
+    f"  PASS RULE (fixed before the results were looked at): a stat earns a place only if (1) its full-season repeat estimate is {PASS_REPEAT:.2f} or more, (2) its link with goal",
+    "  difference is positive, and (3) built from one half of a season's games, its link with the results of the OTHER half, after taking out Corsi, is above zero by more",
+    "  than its noise margin. With eight stats tested, one narrow pass can still be luck: read a pass as 'worth keeping an eye on', not proof.",
     "",
     "HOW EVENTS ARE READ",
     "  The NHL tags every event with a zone from the point of view of the team that did it (shots, hits, giveaways, takeaways, faceoffs). Blocked shots are tagged from",
@@ -149,7 +204,7 @@ def season_coverage(pbp, nhl):
 
 def load_events(pbp, season_id):
     return pd.read_sql_query(
-        """SELECT e.game_id, e.sort_order, e.period, e.time_s, e.situation_code, e.type, e.team_id, e.zone,
+        """SELECT e.game_id, e.sort_order, e.period, e.time_s, e.situation_code, e.type, e.team_id, e.zone, e.x, e.y, e.reason,
                   g.home_team_id, g.away_team_id
            FROM pbp_events e JOIN pbp_games g ON g.game_id = e.game_id
            WHERE g.season_id = ? AND g.game_type = 2 AND g.status = 'ok' AND e.period_type != 'SO'""", pbp, params=[season_id])
@@ -212,11 +267,55 @@ def team_game_stats(ev):
     shots = ev["situation_code"].eq(FIVE_ON_FIVE) & ev["type"].isin(SHOT_TYPES)
     quick = (ev["abs_t"] - ev["prev_t"] <= TRANSITION_WINDOW) & ~ev["prev_type"].isin(NOT_IN_MOTION) & prev_zone_T.isin(["N", "D"])
     sh = ev[shots].assign(transition=quick[shots], opponent=(other - ev["team_id"])[shots])
-    shots_for = sh.groupby(["game_id", "team_id"]).agg(shots_for=("transition", "size"), trans_for=("transition", "sum")).reset_index().rename(columns={"team_id": "T"})
+    # candidate 5) transition shot quality: of the unblocked transition shots, how many came from the slot?
+    # (blocked shots are left out because their location is where the block happened, not where the shot was taken)
+    in_slot = sh["zone"].eq("O") & (sh["y"].abs() <= SLOT_HALF_WIDTH) & sh["x"].abs().between(GOAL_LINE_X - SLOT_DEPTH, GOAL_LINE_X)
+    unblocked = sh["transition"] & sh["type"].ne("blocked-shot")
+    sh = sh.assign(trans_unblocked=unblocked, trans_slot=unblocked & in_slot)
+    shots_for = sh.groupby(["game_id", "team_id"]).agg(shots_for=("transition", "size"), trans_for=("transition", "sum"),
+                                                       trans_unblocked=("trans_unblocked", "sum"), trans_slot=("trans_slot", "sum")).reset_index().rename(columns={"team_id": "T"})
     shots_against = sh.groupby(["game_id", "opponent"]).agg(shots_against=("transition", "size"), trans_against=("transition", "sum")).reset_index().rename(columns={"opponent": "T"})
 
-    out = exit_stats.merge(give_stats, on=["game_id", "T"], how="outer").merge(shots_for, on=["game_id", "T"], how="outer") \
-        .merge(shots_against, on=["game_id", "T"], how="outer").fillna(0)
+    # --- candidate 1) icings: the team that iced the puck is the one that has the next faceoff in its own end ---
+    icing = ev[ev["type"].eq("stoppage") & ev["reason"].eq("icing") & ev["situation_code"].eq(FIVE_ON_FIVE)][["game_id", "sort_order"]]
+    faceoffs = ev[ev["type"].eq("faceoff")][["game_id", "sort_order", "team_id", "zone", "home_team_id", "away_team_id"]].rename(columns={"sort_order": "fo_so"})
+    faceoffs["sort_order"] = faceoffs["fo_so"]
+    ic = pd.merge_asof(icing.sort_values("sort_order"), faceoffs.sort_values("sort_order"), on="sort_order", by="game_id",
+                       direction="forward", allow_exact_matches=False)
+    loser = ic["home_team_id"] + ic["away_team_id"] - ic["team_id"]
+    ic["T"] = np.where(ic["zone"].eq("D"), ic["team_id"], np.where(ic["zone"].eq("O"), loser, np.nan))    # faceoff zone is from the WINNER's side
+    ic = ic.dropna(subset=["T"])
+    ic["T"] = ic["T"].astype(int)
+    icing_stats = ic.groupby(["game_id", "T"]).size().rename("icings").reset_index()
+
+    # --- candidate 2) pinned-in spells: 2+ opponent shot attempts in a row, each within PINNED_GAP seconds, play never leaving the zone ---
+    p = p.sort_values(["game_id", "T", "sort_order"]).reset_index(drop=True)
+    five = p["situation_code"] == FIVE_ON_FIVE
+    opp_shot_in_zone = ~p["mine"] & p["type"].isin(SHOT_TYPES) & p["zone_T"].eq("D") & five
+    breaks = p["type"].isin(STOP_TYPES + ["faceoff", "period-start"]) | p["zone_T"].isin(["N", "O"]) | ~five
+    p["segment"] = breaks.groupby([p["game_id"], p["T"]]).cumsum()
+    os_ = p[opp_shot_in_zone][["game_id", "T", "segment", "abs_t"]].copy()
+    gap = os_.groupby(["game_id", "T", "segment"])["abs_t"].diff()
+    os_["spell"] = (gap.isna() | (gap > PINNED_GAP)).cumsum()
+    spells = os_.groupby("spell").agg(game_id=("game_id", "first"), T=("T", "first"), shots=("abs_t", "size"))
+    pinned_stats = spells[spells["shots"] >= 2].groupby(["game_id", "T"]).agg(pinned=("shots", "size"), pinned_shots=("shots", "sum")).reset_index()
+
+    # --- candidate 3) own-zone turnovers: the team's own-zone giveaways plus the pucks the opponent took off it there ---
+    stripped = p[~p["mine"] & five & p["type"].eq("takeaway") & p["zone_T"].eq("D")].groupby(["game_id", "T"]).size().rename("stripped").reset_index()
+
+    # --- candidate 4) defence to offence: own-zone puck wins (faceoff win, takeaway, blocked shot, opponent's missed shot)
+    #     that become the team's own shot attempt within D2O_WINDOW seconds, before play stops ---
+    wins = p[five & p["zone_T"].eq("D") & ((p["mine"] & p["type"].isin(["faceoff", "takeaway"]))
+                                           | (~p["mine"] & p["type"].isin(["blocked-shot", "missed-shot"])))][["game_id", "T", "sort_order", "abs_t"]]
+    own_shots = p[p["mine"] & p["type"].isin(SHOT_TYPES)]
+    d = forward_match(forward_match(wins, own_shots, "shot"), p[p["type"].isin(STOP_TYPES)], "stop")
+    d["d2o_ok"] = d["shot_so"].notna() & ((d["shot_t"] - d["abs_t"]) <= D2O_WINDOW) & (d["stop_so"].isna() | (d["shot_so"] < d["stop_so"]))
+    d2o_stats = d.groupby(["game_id", "T"]).agg(d2o_starts=("d2o_ok", "size"), d2o_ok=("d2o_ok", "sum")).reset_index()
+
+    out = exit_stats
+    for piece in (give_stats, shots_for, shots_against, icing_stats, pinned_stats, stripped, d2o_stats):
+        out = out.merge(piece, on=["game_id", "T"], how="outer")
+    out = out.fillna(0)
     out["T"] = out["T"].astype(int)
     return out.rename(columns={"T": "team_id"})
 
@@ -240,7 +339,9 @@ def summarize(rows):
     g = rows.groupby(["season_id", "team_id"]).agg(
         games=("game_id", "nunique"), exit_starts=("exit_starts", "sum"), exit_sum=("exit_sum", "sum"), exit_ok=("exit_ok", "sum"),
         exit_fast=("exit_fast", "sum"), giveaways=("giveaways", "sum"), costly=("costly", "sum"), trans_for=("trans_for", "sum"),
-        trans_against=("trans_against", "sum"), shots_for=("shots_for", "sum"), shots_against=("shots_against", "sum"), toi5=("toi5", "sum")).reset_index()
+        trans_against=("trans_against", "sum"), shots_for=("shots_for", "sum"), shots_against=("shots_against", "sum"), toi5=("toi5", "sum"),
+        icings=("icings", "sum"), pinned=("pinned", "sum"), stripped=("stripped", "sum"), d2o_starts=("d2o_starts", "sum"), d2o_ok=("d2o_ok", "sum"),
+        trans_unblocked=("trans_unblocked", "sum"), trans_slot=("trans_slot", "sum")).reset_index()
     hours = g["toi5"] / 3600
     out = g[["season_id", "team_id", "games"]].copy()
     out["exit_time"] = g["exit_sum"] / g["exit_starts"]
@@ -252,13 +353,20 @@ def summarize(rows):
     out["trans_against_pg"] = g["trans_against"] / hours
     out["trans_share"] = g["trans_for"] / (g["trans_for"] + g["trans_against"])
     out["exit_starts"] = g["exit_starts"]
+    # the five candidate stats
+    out["icing_pg"] = g["icings"] / hours
+    out["pinned_pg"] = g["pinned"] / hours
+    out["turnover_pg"] = (g["giveaways"] + g["stripped"]) / hours
+    out["d2o_rate"] = g["d2o_ok"] / g["d2o_starts"]
+    out["trans_slot_share"] = g["trans_slot"] / g["trans_unblocked"]
+    out["d2o_starts"], out["trans_unblocked"] = g["d2o_starts"], g["trans_unblocked"]
     return out.replace([np.inf, -np.inf], np.nan)
 
 
 def add_index(t):
     """z-scores within each season (flipped so higher = better), and the Breakout Index (weighted by WEIGHTS; equal by default)."""
     t = t.copy()
-    for col, _, higher in COMPONENTS:
+    for col, _, higher in ALL_STATS:                                      # the three index stats and the five candidates
         z = ps.zscore_by_season(t, col)
         t[f"z_{col}"] = z if higher else -z
     z = t[Z_COLS]
@@ -342,8 +450,9 @@ def links_table(t):
 
 
 def internal_links(t):
-    cols = [c for c, _, _ in COMPONENTS]
-    names = {c: n.split(" (")[0] for c, n, _ in COMPONENTS}
+    """How the eight stats move together. Every stat is turned so that higher = better, so a positive number means 'good at one, good at the other'."""
+    cols = ALL_Z
+    names = {f"z_{c}": short(n) for c, n, _ in ALL_STATS}
     rows = []
     for a in cols:
         row = {"": names[a]}
@@ -355,11 +464,14 @@ def internal_links(t):
 
 def level_by_season(t):
     g = t.groupby("season_id").agg(exit_time=("exit_time", "mean"), quick_exit=("quick_exit", "mean"), exit_success=("exit_success", "mean"),
-                                   costly_pg=("costly_pg", "mean"), costly_share=("costly_share", "mean"), trans_pg=("trans_pg", "mean")).reset_index()
+                                   costly_pg=("costly_pg", "mean"), costly_share=("costly_share", "mean"), trans_pg=("trans_pg", "mean"),
+                                   icing_pg=("icing_pg", "mean"), pinned_pg=("pinned_pg", "mean"), turnover_pg=("turnover_pg", "mean"),
+                                   d2o_rate=("d2o_rate", "mean"), trans_slot_share=("trans_slot_share", "mean")).reset_index()
     g.insert(0, "Season", g["season_id"].map(season_label))
     g = g.drop(columns="season_id").round(3)
     g.columns = ["Season", "Avg zone exit time (s)", "Share of exits within 8 s", "Share of attempts that cleared the zone", "Costly giveaways /60",
-                 "Share of own-zone giveaways that were costly", "Transition shot attempts /60"]
+                 "Share of own-zone giveaways that were costly", "Transition shot attempts /60", "Icings /60", "Pinned-in spells /60",
+                 "Own-zone turnovers /60", "Defence-to-offence rate", "Transition shots from the slot (share)"]
     return g
 
 
@@ -391,8 +503,67 @@ def checkpoint_features(game_rows, nhl, checkpoints):
         d = checkpoints[checkpoints["checkpoint"] == cp][["season_id", "date"]]
         r = rows.merge(d, on="season_id")
         r = r[r["game_date"] <= r["date"]]
-        out[cp] = add_index(summarize(r))[["season_id", "team_id", "z_breakout", "breakout"] + Z_COLS]
+        out[cp] = add_index(summarize(r))[["season_id", "team_id", "z_breakout", "breakout"] + ALL_Z]
     return out
+
+
+# ----------------------------------------------------------------------------
+# The scorecard: the same tests for every stat, and the PASS RULE
+# ----------------------------------------------------------------------------
+def short(name):
+    return name.split(" (")[0].split(":")[0]
+
+
+def scorecard(team, game_rows, nhl, seasons, contender):
+    """
+    One row per stat (the three in the index and the five candidates). Every link is turned so that POSITIVE = good
+    for the team (fewer icings, more defence-to-offence...). The PASS RULE at the top of this file decides the last column.
+    """
+    season_ids = sorted(int(s) for s in team["season_id"].unique() if s in set(seasons))
+    n = len(season_ids)
+    one_each = np.eye(len(ALL_Z))                                        # "mixes" that are simply each stat on its own
+    targets = ["pts_pct", "gd_pg"]
+
+    def stack(parts):
+        return {k: np.vstack([p[k] for p in parts]) for k in parts[0]}
+
+    same = stack([mix_links(team[team["season_id"] == s], one_each, targets, ALL_Z) for s in season_ids])
+    halves = half_frames(game_rows, nhl, season_ids)
+    parts = []
+    for s in season_ids:
+        a, b = (mix_links(h[h["season_id"] == s], one_each, targets, ALL_Z) for h in halves)
+        parts.append({k: (a[k] + b[k]) / 2 for k in a})
+    other = stack(parts)
+    other_beyond = (other["pts_pct_beyond"] + other["gd_pg_beyond"]) / 2          # one row per season, one column per stat
+    margin = 2 * other_beyond.std(axis=0, ddof=1) / np.sqrt(n) if n > 1 else np.full(len(ALL_Z), np.nan)
+
+    odd = add_index(summarize(game_rows[game_rows["game_id"] % 2 == 1]))
+    even = add_index(summarize(game_rows[game_rows["game_id"] % 2 == 0]))
+    m = odd.merge(even, on=["season_id", "team_id"], suffixes=("_a", "_b"))
+    rows = []
+    for i, (col, name, _) in enumerate(ALL_STATS):
+        half = float(ps.season_spearman(m, f"{col}_a", f"{col}_b").mean())
+        full = 2 * half / (1 + half)
+        d = team.dropna(subset=[f"z_{col}", "es_dz_pct"])
+        edge = float(ps.season_spearman(d, f"z_{col}", "es_dz_pct").mean()) if len(d) > 30 else np.nan
+        goal_diff_link = float(same["gd_pg"][:, i].mean())
+        beyond, noise = float(other_beyond[:, i].mean()), float(margin[i])
+        checks = [(full >= PASS_REPEAT, "does not repeat enough"), (goal_diff_link > 0, "points the wrong way"),
+                  (beyond > noise, "adds nothing beyond Corsi that is clear of the noise")]
+        gain, gain_margin = contender.get(col, (np.nan, np.nan))
+        rows.append({
+            "Statistic": name, "Status": "in the index" if i < len(COMPONENTS) else "candidate",
+            "Repeats (odd vs even games)": round(half, 2), "Full-season estimate": round(full, 2),
+            "Link with points %": round(float(same["pts_pct"][:, i].mean()), 2), "Link with goal difference": round(goal_diff_link, 2),
+            "Same season, beyond Corsi": round(float(((same["pts_pct_beyond"] + same["gd_pg_beyond"]) / 2)[:, i].mean()), 2),
+            "Other half of the season: link with results": round(float(((other["pts_pct"] + other["gd_pg"]) / 2)[:, i].mean()), 2),
+            "Other half, beyond Corsi": round(beyond, 3), "Noise margin (+/-)": round(noise, 3),
+            "Link with NHL own-zone time (negative = less time in own end)": round(edge, 2) if pd.notna(edge) else None,
+            "Contender score gain (AUC)": round(gain, 3) if pd.notna(gain) else None,
+            "Contender margin (+/-)": round(gain_margin, 3) if pd.notna(gain_margin) else None,
+            "Passes all three rules?": "YES" if all(ok for ok, _ in checks) else "no",
+            "Why not": "; ".join(text for ok, text in checks if not ok)})
+    return pd.DataFrame(rows)
 
 
 # ----------------------------------------------------------------------------
@@ -413,15 +584,16 @@ def _rank_links(scores, target):
     return (rc * yc[:, None]).sum(axis=0) / np.sqrt((rc ** 2).sum(axis=0) * (yc ** 2).sum())
 
 
-def mix_links(frame, mixes, targets):
+def mix_links(frame, mixes, targets, cols=None):
     """
     For one season: how every weight mix lines up with each target. Three versions per target:
       target            the plain rank correlation
       target_beyond     the same after taking out what Corsi already explains (a 'partial' correlation)
       target_corsi      Corsi's own link with the target (one number, the benchmark)
     """
-    d = frame.dropna(subset=Z_COLS + targets + ["corsi"])
-    scores = d[Z_COLS].to_numpy() @ mixes.T
+    cols = cols or Z_COLS
+    d = frame.dropna(subset=cols + targets + ["corsi"])
+    scores = d[cols].to_numpy() @ mixes.T
     with_corsi = _rank_links(scores, d["corsi"])
     out = {}
     for t in targets:
@@ -441,7 +613,7 @@ def half_frames(game_rows, nhl, seasons):
     bench = benchmark_halves(nhl, seasons)                               # corsi_a = odd games, corsi_b = even games
     frames = []
     for parity, suffix in ((1, "_a"), (0, "_b")):
-        z = add_index(summarize(game_rows[game_rows["game_id"] % 2 == parity]))[["season_id", "team_id"] + Z_COLS]
+        z = add_index(summarize(game_rows[game_rows["game_id"] % 2 == parity]))[["season_id", "team_id"] + ALL_Z]
         r = results[results["game_id"] % 2 != parity].groupby(["season_id", "team_id"]).agg(
             pts=("points", "sum"), n=("points", "size"), gd=("gd", "sum")).reset_index()
         r["pts_pct"], r["gd_pg"] = r["pts"] / (2 * r["n"]), r["gd"] / r["n"]
@@ -534,19 +706,20 @@ def forecast_test(connection, game_rows, covered, force):
     """Does the index add to the contender score? Returns (table, note)."""
     if len(covered) < MIN_SEASONS_FOR_FORECAST and not force:
         return pd.DataFrame(), (f"Not run yet: only {len(covered)} seasons of play-by-play are downloaded and the hold-out test needs "
-                                f"{MIN_SEASONS_FOR_FORECAST} or more. Rerun this script when the download has finished.")
+                                f"{MIN_SEASONS_FOR_FORECAST} or more. Rerun this script when the download has finished."), {}
     games_raw, seasons, checkpoints = cf.load(connection)
     games, _ = ps.prepare_games(games_raw, seasons)
     tables = cf.build_checkpoint_tables(games, seasons, checkpoints)
     feats = checkpoint_features(game_rows, connection, checkpoints)
     v1 = cf.MODELS["Model 3: + power kill (PP% + PK%)"]
     rows = []
+    one_at_a_time = {c: [] for c, _, _ in ALL_STATS}
     for cp in CP_ORDER:
         t = tables[cp].merge(feats[cp], on=["season_id", "team_id"], how="inner")
         t = t[t["season_id"].isin(covered)].copy()
         if t["season_id"].nunique() < 3:
             continue
-        t[Z_COLS] = t[Z_COLS].fillna(0.0)
+        t[ALL_Z] = t[ALL_Z].fillna(0.0)
         t["v1"] = cf.held_out_scores(t, v1)
         t["v1+breakout"] = cf.held_out_scores(t, v1 + ["breakout"])
         t["v1+three"] = cf.held_out_scores(t, v1 + [c for c, _, _ in COMPONENTS])     # the model picks its own weight for each stat
@@ -558,9 +731,17 @@ def forecast_test(connection, game_rows, covered, force):
                      "Gain (separately)": diff3.mean(), "Margin (separately)": 2 * diff3.std(ddof=1) / np.sqrt(len(diff3)),
                      "Avg finalist rank v1": a["avg_rank_f4"].mean(), "Avg finalist rank with index": b["avg_rank_f4"].mean(),
                      "Seasons better": int((b["avg_rank_f4"] < a["avg_rank_f4"]).sum()), "Seasons worse": int((b["avg_rank_f4"] > a["avg_rank_f4"]).sum())})
+        for col, _, _ in ALL_STATS:                                      # each stat added to version 1 on its own
+            t["one"] = cf.held_out_scores(t, v1 + [col])
+            one_at_a_time[col].append(cf.per_season_metrics(t, "one")["auc"] - a["auc"])
     table = pd.DataFrame(rows).round(3)
     note = "Hold-out test run on " + f"{len(covered)} seasons" + (" (FORCED with fewer than 8 seasons: treat as a code check, not a result)." if len(covered) < MIN_SEASONS_FOR_FORECAST else ".")
-    return table, note
+    contender = {}
+    for col, gains in one_at_a_time.items():
+        if gains:
+            by_season = pd.concat(gains, axis=1).mean(axis=1)            # one number per season: the gain averaged over the five checkpoints
+            contender[col] = (float(by_season.mean()), float(2 * by_season.std(ddof=1) / np.sqrt(len(by_season))))
+    return table, note, contender
 
 
 # ----------------------------------------------------------------------------
@@ -580,7 +761,22 @@ def weights_sentence(w):
               f"Predicting the OTHER half of the same season: {w['other_best']:+.2f} (chosen) and {w['other_equal']:+.2f} (equal); beyond Corsi {w['other_beyond_best']:+.2f} and {w['other_beyond_equal']:+.2f}.")
 
 
-def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seasons, season_list, weights=None):
+def card_sentence(card):
+    yes = card["Passes all three rules?"] == "YES"
+    candidates, current = card[card["Status"] == "candidate"], card[card["Status"] == "in the index"]
+    parts = []
+    for _, r in candidates.iterrows():
+        result = "PASSES" if r["Passes all three rules?"] == "YES" else "fails (" + r["Why not"] + ")"
+        parts.append(f"{short(r['Statistic'])}: repeats {r['Full-season estimate']:.2f}, link with goal difference {r['Link with goal difference']:+.2f}, "
+                     f"beyond Corsi in the other half {r['Other half, beyond Corsi']:+.3f} (noise +/-{r['Noise margin (+/-)']:.3f}): {result}")
+    return (f"The rule was fixed before looking: a stat must repeat ({PASS_REPEAT:.2f} or more over a full season), point the right way, and add something beyond Corsi "
+            f"in the OTHER half of the season that is clear of the noise. {int(yes[candidates.index].sum())} of {len(candidates)} new stats pass. "
+            + " | ".join(parts)
+            + f" | Held to the same rule, {int(yes[current.index].sum())} of the {len(current)} stats already in the index pass."
+            + " With eight stats tested, one narrow pass can still be luck.")
+
+
+def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seasons, season_list, weights=None, card=None):
     rel = reliab.set_index("Statistic")["Repeats: odd vs even games"]
     link = links.set_index("Breakout statistic")
     idx = link.loc["Breakout Index (higher is better)"]
@@ -600,6 +796,7 @@ def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seaso
         ("Does it match the NHL's real zone time?", (f"Zone exit time vs share of 5v5 time in the team's own zone: {edge_exit:+.2f} (positive is what we expect: slow exits, more time in your own end). "
                                                       f"Breakout Index vs offensive-zone share: {edge_idx:+.2f}.") if pd.notna(edge_exit) else "Not testable yet: no 2021-22-or-later seasons have finished downloading."),
         ("Which weights work best?", weights_sentence(weights) if weights else "Not run."),
+        ("The five new stats", card_sentence(card) if card is not None else "Not run."),
         ("Does it improve the contender score?", forecast_note + (" " + _forecast_sentence(forecast) if len(forecast) else "")),
         ("Champions", f"Average Breakout Index percentile: Won Cup {d.loc['Won Cup', 'Breakout Index (percentile)']:.0f}, Lost Cup final {d.loc['Lost Cup final', 'Breakout Index (percentile)']:.0f}, "
                       f"Missed playoffs {d.loc['Missed playoffs', 'Breakout Index (percentile)']:.0f} (100 = best, 50 = average)." if "Won Cup" in d.index else "No champions in the seasons downloaded so far."),
@@ -710,10 +907,11 @@ def main():
     internal = internal_links(team)
     level = level_by_season(team)
     champs = champion_profile(team[team["include_main"].fillna("Y") == "Y"])
-    forecast, note = forecast_test(nhl, game_rows[game_rows["season_id"].isin([s for s in usable if s not in odd_seasons])],
-                                   [s for s in usable if s not in odd_seasons], args.force_forecast)
-    weights = weight_test(main_team, game_rows, nhl, [s for s in usable if s not in odd_seasons]) if len(usable) >= 3 else None
-    verdict = verdict_lines(reliab, links, level, forecast, note, champs, len(usable), ", ".join(season_label(s) for s in usable), weights)
+    normal = [s for s in usable if s not in odd_seasons]
+    forecast, note, contender = forecast_test(nhl, game_rows[game_rows["season_id"].isin(normal)], normal, args.force_forecast)
+    weights = weight_test(main_team, game_rows, nhl, normal) if len(usable) >= 3 else None
+    card = scorecard(main_team, game_rows, nhl, normal, contender) if len(usable) >= 3 else None
+    verdict = verdict_lines(reliab, links, level, forecast, note, champs, len(usable), ", ".join(season_label(s) for s in usable), weights, card)
     used = " / ".join(f"{w / sum(WEIGHTS):.0%}" for w in WEIGHTS)
     print(f"Weights used for the index in this run (zone exit time / costly giveaways / transition shots): {used}")
 
@@ -724,12 +922,20 @@ def main():
         "Share of attempts that cleared the zone": out["exit_success"].round(3), "Costly giveaways /60": out["costly_pg"].round(2),
         "Share of own-zone giveaways that were costly": out["costly_share"].round(3), "Transition shot attempts /60": out["trans_pg"].round(2),
         "Transition shot attempts against /60": out["trans_against_pg"].round(2), "Transition shot share": out["trans_share"].round(3),
-        "Own-zone starts counted": out["exit_starts"].astype(int), "Points %": out["pts_pct"].round(3), "Corsi % (5v5)": (out["corsi"] * 100).round(1),
+        "Own-zone starts counted": out["exit_starts"].astype(int),
+        "Icings /60": out["icing_pg"].round(2), "Pinned-in spells /60": out["pinned_pg"].round(2), "Own-zone turnovers /60": out["turnover_pg"].round(2),
+        "Defence-to-offence rate": out["d2o_rate"].round(3), "Transition shots from the slot (share)": out["trans_slot_share"].round(3),
+        "Points %": out["pts_pct"].round(3), "Corsi % (5v5)": (out["corsi"] * 100).round(1),
         "How the season ended": out["outcome"]}).reset_index(drop=True)
 
-    sheets = {"Verdict": verdict, "Repeats": reliab, "Links": links, "Between the three": internal, "Level by season": level,
+    sheets = {"Verdict": verdict, "Repeats": reliab, "Links": links, "Between the stats": internal, "Level by season": level,
               "Champions": champs, "Contender test": forecast if len(forecast) else pd.DataFrame({"": [note]}), "Team-seasons": teams_out}
-    notes = {"Links": "Rank correlation (within each season, averaged) between each breakout statistic and other team numbers. Positive is expected for the index; for exit time and costly giveaways negative is 'good'."}
+    notes = {"Links": "Rank correlation (within each season, averaged) between each breakout statistic and other team numbers. Positive is expected for the index; for exit time and costly giveaways negative is 'good'.",
+             "Between the stats": "How the eight stats move together (rank correlation within each season, averaged). Each is turned so higher = better: a positive number means teams good at one tend to be good at the other."}
+    if card is not None:
+        sheets = {"Verdict": verdict, "New stats": card, **{k: v for k, v in sheets.items() if k != "Verdict"}}
+        notes["New stats"] = ("The same tests for every stat. Every link is turned so that POSITIVE = good for the team. A stat passes only if it repeats (full-season estimate 0.50+), "
+                              "points the right way, and its 'Other half, beyond Corsi' number is bigger than its noise margin. The rule was fixed before the results were looked at.")
     if weights:
         sheets = {"Verdict": verdict, "Weights": weights["summary"], "Weights by season": weights["folds"], "Weight grid": weights["grid"],
                   **{k: v for k, v in sheets.items() if k != "Verdict"}}
@@ -751,7 +957,9 @@ def main():
     print("\nLevel by season:"); print(level.to_string(index=False))
     print("\nRepeats (odd vs even games):"); print(reliab.to_string(index=False))
     print("\nLinks:"); print(links.to_string(index=False))
-    print("\nBetween the three stats:"); print(internal.to_string(index=False))
+    print("\nBetween the stats (each turned so higher = better):"); print(internal.to_string(index=False))
+    if card is not None:
+        print("\nScorecard, one column per stat:"); print(card.set_index("Statistic").T.rename(columns=short).to_string())
     print("\nChampions:"); print(champs.to_string(index=False))
     if weights:
         print("\nWeights: how each weighting lines up with good teams:"); print(weights["summary"].T.to_string(header=False))

@@ -119,7 +119,10 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     end" statistics from the play-by-play at 5-on-5 (zone exit time, costly giveaways, transition shots), blends them
     into one index, and tests whether it repeats, whether it lines up with the NHL's real zone time and with winning,
     which mix of weights for the three works best (chosen on all seasons but one, scored on the one left out),
-    and whether it improves the contender score on seasons the score has never seen. It uses only seasons that are
+    and whether it improves the contender score on seasons the score has never seen. It also scores five more
+    candidate stats (icings, pinned-in spells, own-zone turnovers, defence-to-offence rate, transition shot quality)
+    against a pass rule written down in advance: repeats, points the right way, and adds something beyond
+    shot-attempt share in the other half of the season. It uses only seasons that are
     fully downloaded, so it can be run while the download is still going and rerun when it has finished:
     ```
     python scripts/build_breakout_index.py
