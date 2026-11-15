@@ -141,6 +141,23 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     python scripts/build_breakout_search.py
     ```
     The workbook is `outputs/breakout_search.xlsx`: start with its "Verdict" sheet.
+13. The search for the right breakout metric, round 2, and the blind test. Every stat is also built from close-score
+    moments only and as a "battle" (ours minus the opponent's in the same games), with a few tuned time windows:
+    64 building blocks, every combination of up to four (about 679,000), plus a data-weighted version. The best
+    recipe for "our own breakouts" and the best "breakout battle" recipe are frozen in
+    `reference/breakout_metric_frozen.json`:
+    ```
+    python scripts/build_breakout_round2.py
+    ```
+    The workbook is `outputs/breakout_round2.xlsx`. Five seasons (2009-10 to 2013-14) are kept out of every breakout
+    script (the `LOCKBOX` list in `build_breakout_index.py`) so that the frozen recipes can be scored on them once,
+    when they have all downloaded:
+    ```
+    python scripts/build_breakout_round2.py --blind-test
+    ```
+    That writes `outputs/breakout_blind_test.xlsx` and records the result in the frozen file. Finish line: the recipe
+    predicts games it has not seen at 0.46 or better (Corsi's level); to count as a separate edge it must also add
+    something after Corsi and expected goals are taken out.
 
 ## The play-by-play download (overnight)
 

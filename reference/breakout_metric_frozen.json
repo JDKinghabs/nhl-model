@@ -1,0 +1,101 @@
+{
+  "frozen_on": "2026-11-15",
+  "note": "Chosen on the search seasons only. To be scored ONCE on the lockbox seasons with: python scripts/build_breakout_round2.py --blind-test",
+  "search_seasons": [
+    20142015,
+    20152016,
+    20162017,
+    20172018,
+    20182019,
+    20212022,
+    20222023,
+    20232024,
+    20242025,
+    20252026
+  ],
+  "lockbox": [
+    20092010,
+    20102011,
+    20112012,
+    20122013,
+    20132014
+  ],
+  "settings": {
+    "EXIT_CAP": 20,
+    "FAST_EXIT": 8,
+    "GIVEAWAY_WINDOW": 10,
+    "TRANSITION_WINDOW": 5,
+    "PINNED_GAP": 30,
+    "D2O_WINDOW": 20,
+    "SLOT_HALF_WIDTH": 22,
+    "SLOT_DEPTH": 35,
+    "FEATURES_VERSION": 2
+  },
+  "finish_line": {
+    "predicts_unseen_games_at_least": 0.46,
+    "separate_edge": "after Corsi and expected goals are taken out: above its noise margin, odds of luck under 5%"
+  },
+  "metrics": {
+    "own": {
+      "label": "Our own breakouts",
+      "kind": "data-set weights (ridge)",
+      "weights": {
+        "pinned_danger_pg|own": 0.1174,
+        "pinned45_pg|own": 0.1108,
+        "turnover_pg|own": 0.1015,
+        "costly_pg|own_c": -0.0997,
+        "d2o30_rate|own_c": 0.0782,
+        "pinned_pg|own": 0.077,
+        "d2o30_rate|own": 0.0742,
+        "turnover_pg|own_c": 0.0677,
+        "quick_exit|own_c": 0.0641,
+        "trans_slot_share|own_c": 0.0619,
+        "trans_slot_share|own": 0.0557,
+        "pinned45_pg|own_c": 0.0524,
+        "costly_share|own": 0.0452,
+        "exit_success|own": 0.043,
+        "pinned15_pg|own_c": -0.0399,
+        "exit_time|own": 0.0348,
+        "pinned_pg|own_c": 0.0329,
+        "d2o10_rate|own": -0.0313,
+        "trans_pg|own": 0.0306,
+        "exit_time|own_c": -0.027,
+        "costly_pg|own": -0.025,
+        "costly_share|own_c": -0.0249,
+        "pinned_danger_pg|own_c": 0.023,
+        "exit_success|own_c": 0.0176,
+        "d2o10_rate|own_c": -0.0171,
+        "d2o_rate|own_c": -0.0166,
+        "pinned15_pg|own": -0.0131,
+        "icing_pg|own": -0.0119,
+        "icing_pg|own_c": 0.0108,
+        "d2o_rate|own": 0.008,
+        "quick_exit|own": 0.0055,
+        "trans_pg|own_c": 0.005
+      },
+      "on_the_search_seasons": {
+        "predicts_unseen_games_honest": 0.374,
+        "data_weighted_honest": 0.403,
+        "frozen_recipe_all_seasons": 0.419,
+        "combinations_tried": 41448
+      }
+    },
+    "battle": {
+      "label": "Breakout battle",
+      "kind": "plain average",
+      "weights": {
+        "pinned_pg|battle_c": 0.25,
+        "pinned_danger_pg|battle": 0.25,
+        "turnover_pg|battle": 0.25,
+        "trans_slot_share|battle": 0.25
+      },
+      "on_the_search_seasons": {
+        "predicts_unseen_games_honest": 0.464,
+        "data_weighted_honest": 0.454,
+        "frozen_recipe_all_seasons": 0.495,
+        "combinations_tried": 679120
+      }
+    }
+  },
+  "blind_test": null
+}

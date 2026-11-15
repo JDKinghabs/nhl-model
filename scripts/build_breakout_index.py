@@ -64,7 +64,8 @@ WHAT IT DOES (in Excel terms):
 HOW TO RUN IT (in the terminal, from the "Model 2.0" folder):
     python scripts/build_breakout_index.py
     Safe to run while the download is still going; it uses the seasons that are fully downloaded so far.
-    Rerun it when the download finishes to use every season.
+    Five early seasons (2009-10 to 2013-14) are deliberately left out: they are kept for a one-time blind test of the
+    final metric (see LOCKBOX below and build_breakout_round2.py).
     Options:  --seasons 20232024,20242025     only those seasons
               --weights 0.5,0.2,0.3           weights for zone exit time, costly giveaways, transition shots (default: equal)
               --exit-cap 30                   seconds after which a zone exit counts as failed (default 20)
@@ -127,6 +128,14 @@ D2O_WINDOW = 20          # seconds from an own-zone puck win to the team's own s
 SLOT_HALF_WIDTH = 22     # feet either side of the middle of the ice (the faceoff dots are 22 feet out)
 SLOT_DEPTH = 35          # feet out from the goal line (the top of the faceoff circles)
 GOAL_LINE_X = 89         # the goal line is 89 feet from centre ice in the NHL's coordinates
+PINNED_GAPS = [(PINNED_GAP, ""), (15, "15"), (45, "45")]     # the normal gap, plus a shorter and a longer one for round 2 of the search
+D2O_WINDOWS = [(D2O_WINDOW, ""), (10, "10"), (30, "30")]     # the normal window, plus a shorter and a longer one
+
+# ---- The blind test. These five seasons have never been used in any test. Every script leaves them alone, so that the one
+#      metric the search ends up with can be tried on them ONCE (build_breakout_round2.py --blind-test). Do not remove a season
+#      from this list to "have a look": a peek spends the only clean test we have. ----
+LOCKBOX = [20092010, 20102011, 20112012, 20122013, 20132014]
+FEATURES_VERSION = 2     # raise this when team_game_stats changes, so saved copies of its output are rebuilt
 CANDIDATES = [  # (column, plain name, higher is better?)
     ("icing_pg", "Icings per 60 (lower is better)", False),
     ("pinned_pg", "Pinned-in spells per 60 (lower is better)", False),
@@ -219,10 +228,34 @@ def forward_match(left, right, name):
                          direction="forward", allow_exact_matches=False)
 
 
+def both(frame, sums):
+    """
+    Adds things up per team per game twice: over the whole game, and over CLOSE-SCORE moments only (columns ending _c).
+    `sums` maps the name of each total to the column to add up; `frame` needs the columns game_id, T and close.
+    """
+    data = {name: frame[col].astype(float) for name, col in sums.items()}
+    data.update({f"{name}_c": frame[col].astype(float) * frame["close"] for name, col in sums.items()})
+    return pd.DataFrame(data).groupby([frame["game_id"], frame["T"]]).sum().reset_index()
+
+
 def team_game_stats(ev):
-    """From one season's events, one row per team per game with the counts the three stats are built from."""
+    """From one season's events, one row per team per game with the counts every breakout stat is built from."""
     ev = ev.sort_values(["game_id", "sort_order"]).reset_index(drop=True)
     ev["abs_t"] = (ev["period"] - 1) * 1200 + ev["time_s"]
+    ev["one"] = 1
+
+    # --- the score before every event, and whether the game is CLOSE (within one goal in periods 1-2, tied after that).
+    #     A team sitting on a lead lets itself be pinned in, so close-score moments are a cleaner read. ---
+    goal = ev["type"].eq("goal")
+    home_goal = (goal & ev["team_id"].eq(ev["home_team_id"])).astype(int)
+    away_goal = (goal & ev["team_id"].eq(ev["away_team_id"])).astype(int)
+    lead = (home_goal.groupby(ev["game_id"]).cumsum() - home_goal) - (away_goal.groupby(ev["game_id"]).cumsum() - away_goal)
+    ev["close"] = np.where(ev["period"] <= 2, lead.abs() <= 1, lead == 0)
+    # the clock: seconds of 5-on-5 play, and of close-score 5-on-5 play, counted from the time between events
+    gap_to_next = (ev.groupby(["game_id", "period"])["abs_t"].shift(-1) - ev["abs_t"]).clip(lower=0).fillna(0)
+    five_now = ev["situation_code"].eq(FIVE_ON_FIVE)
+    clock = pd.DataFrame({"game_id": ev["game_id"], "ev5": gap_to_next.where(five_now, 0), "ev5_c": gap_to_next.where(five_now & ev["close"], 0)}
+                         ).groupby("game_id").sum().reset_index()
 
     # --- every event read from BOTH teams' points of view ---
     home = ev.assign(T=ev["home_team_id"])
@@ -235,7 +268,7 @@ def team_game_stats(ev):
     five = p["situation_code"] == FIVE_ON_FIVE
 
     # --- 1) zone exit time ---
-    starts = p[p["mine"] & five & p["zone_T"].eq("D") & p["type"].isin(["faceoff", "takeaway"])][["game_id", "T", "sort_order", "abs_t"]]
+    starts = p[p["mine"] & five & p["zone_T"].eq("D") & p["type"].isin(["faceoff", "takeaway"])][["game_id", "T", "sort_order", "abs_t", "close", "one"]]
     exits = p[p["zone_T"].isin(["N", "O"])]
     fails = p[p["type"].isin(STOP_TYPES) | (~p["mine"] & p["type"].isin(SHOT_TYPES))
               | (p["mine"] & p["type"].eq("giveaway") & p["zone_T"].eq("D")) | ~five]
@@ -244,17 +277,16 @@ def team_game_stats(ev):
     ok = s["exit_so"].notna() & (s["fail_so"].isna() | (s["exit_so"] < s["fail_so"])) & (took <= EXIT_CAP)
     s["exit_seconds"] = np.where(ok, took, EXIT_CAP)
     s["exit_ok"], s["exit_fast"] = ok, ok & (took <= FAST_EXIT)
-    exit_stats = s.groupby(["game_id", "T"]).agg(exit_starts=("exit_seconds", "size"), exit_sum=("exit_seconds", "sum"),
-                                                 exit_ok=("exit_ok", "sum"), exit_fast=("exit_fast", "sum")).reset_index()
+    exit_stats = both(s, {"exit_starts": "one", "exit_sum": "exit_seconds", "exit_ok": "exit_ok", "exit_fast": "exit_fast"})
 
     # --- 2) costly giveaways ---
-    gives = p[p["mine"] & five & p["type"].eq("giveaway") & p["zone_T"].eq("D")][["game_id", "T", "sort_order", "abs_t"]]
+    gives = p[p["mine"] & five & p["type"].eq("giveaway") & p["zone_T"].eq("D")][["game_id", "T", "sort_order", "abs_t", "close", "one"]]
     opp_shots = p[~p["mine"] & p["type"].isin(SHOT_TYPES)]
     stops = p[p["type"].isin(STOP_TYPES)]
     g = forward_match(forward_match(gives, opp_shots, "shot"), stops, "stop")
     costly = g["shot_so"].notna() & ((g["shot_t"] - g["abs_t"]) <= GIVEAWAY_WINDOW) & (g["stop_so"].isna() | (g["shot_so"] < g["stop_so"]))
     g["costly"] = costly
-    give_stats = g.groupby(["game_id", "T"]).agg(giveaways=("costly", "size"), costly=("costly", "sum")).reset_index()
+    give_stats = both(g, {"giveaways": "one", "costly": "costly"})
 
     # --- 3) transition shots (and all 5v5 shot attempts, for comparison) ---
     ev["prev_type"] = ev.groupby("game_id")["type"].shift(1)
@@ -272,12 +304,11 @@ def team_game_stats(ev):
     in_slot = sh["zone"].eq("O") & (sh["y"].abs() <= SLOT_HALF_WIDTH) & sh["x"].abs().between(GOAL_LINE_X - SLOT_DEPTH, GOAL_LINE_X)
     unblocked = sh["transition"] & sh["type"].ne("blocked-shot")
     sh = sh.assign(trans_unblocked=unblocked, trans_slot=unblocked & in_slot)
-    shots_for = sh.groupby(["game_id", "team_id"]).agg(shots_for=("transition", "size"), trans_for=("transition", "sum"),
-                                                       trans_unblocked=("trans_unblocked", "sum"), trans_slot=("trans_slot", "sum")).reset_index().rename(columns={"team_id": "T"})
-    shots_against = sh.groupby(["game_id", "opponent"]).agg(shots_against=("transition", "size"), trans_against=("transition", "sum")).reset_index().rename(columns={"opponent": "T"})
+    shots_for = both(sh.assign(T=sh["team_id"]), {"shots_for": "one", "trans_for": "transition", "trans_unblocked": "trans_unblocked", "trans_slot": "trans_slot"})
+    shots_against = both(sh.assign(T=sh["opponent"]), {"shots_against": "one", "trans_against": "transition"})
 
     # --- candidate 1) icings: the team that iced the puck is the one that has the next faceoff in its own end ---
-    icing = ev[ev["type"].eq("stoppage") & ev["reason"].eq("icing") & ev["situation_code"].eq(FIVE_ON_FIVE)][["game_id", "sort_order"]]
+    icing = ev[ev["type"].eq("stoppage") & ev["reason"].eq("icing") & ev["situation_code"].eq(FIVE_ON_FIVE)][["game_id", "sort_order", "close", "one"]]
     faceoffs = ev[ev["type"].eq("faceoff")][["game_id", "sort_order", "team_id", "zone", "home_team_id", "away_team_id"]].rename(columns={"sort_order": "fo_so"})
     faceoffs["sort_order"] = faceoffs["fo_so"]
     ic = pd.merge_asof(icing.sort_values("sort_order"), faceoffs.sort_values("sort_order"), on="sort_order", by="game_id",
@@ -286,72 +317,110 @@ def team_game_stats(ev):
     ic["T"] = np.where(ic["zone"].eq("D"), ic["team_id"], np.where(ic["zone"].eq("O"), loser, np.nan))    # faceoff zone is from the WINNER's side
     ic = ic.dropna(subset=["T"])
     ic["T"] = ic["T"].astype(int)
-    icing_stats = ic.groupby(["game_id", "T"]).size().rename("icings").reset_index()
+    icing_stats = both(ic, {"icings": "one"})
 
-    # --- candidate 2) pinned-in spells: 2+ opponent shot attempts in a row, each within PINNED_GAP seconds, play never leaving the zone ---
+    # --- candidate 2) pinned-in spells: 2+ opponent shot attempts in a row, each within PINNED_GAP seconds, play never leaving the zone.
+    #     Also counted with a shorter and a longer gap, and the DANGEROUS ones (a spell with an unblocked shot from the slot). ---
     p = p.sort_values(["game_id", "T", "sort_order"]).reset_index(drop=True)
     five = p["situation_code"] == FIVE_ON_FIVE
     opp_shot_in_zone = ~p["mine"] & p["type"].isin(SHOT_TYPES) & p["zone_T"].eq("D") & five
     breaks = p["type"].isin(STOP_TYPES + ["faceoff", "period-start"]) | p["zone_T"].isin(["N", "O"]) | ~five
     p["segment"] = breaks.groupby([p["game_id"], p["T"]]).cumsum()
-    os_ = p[opp_shot_in_zone][["game_id", "T", "segment", "abs_t"]].copy()
+    p["slot"] = p["type"].ne("blocked-shot") & (p["y"].abs() <= SLOT_HALF_WIDTH) & p["x"].abs().between(GOAL_LINE_X - SLOT_DEPTH, GOAL_LINE_X)
+    os_ = p[opp_shot_in_zone][["game_id", "T", "segment", "abs_t", "close", "slot"]].copy()
     gap = os_.groupby(["game_id", "T", "segment"])["abs_t"].diff()
-    os_["spell"] = (gap.isna() | (gap > PINNED_GAP)).cumsum()
-    spells = os_.groupby("spell").agg(game_id=("game_id", "first"), T=("T", "first"), shots=("abs_t", "size"))
-    pinned_stats = spells[spells["shots"] >= 2].groupby(["game_id", "T"]).agg(pinned=("shots", "size"), pinned_shots=("shots", "sum")).reset_index()
+    pinned_pieces = []
+    for seconds, tag in PINNED_GAPS:
+        os_["spell"] = (gap.isna() | (gap > seconds)).cumsum()
+        spells = os_.groupby("spell").agg(game_id=("game_id", "first"), T=("T", "first"), close=("close", "first"),
+                                          shots=("abs_t", "size"), danger=("slot", "max"))
+        spells = spells[spells["shots"] >= 2].assign(one=1)
+        sums = {f"pinned{tag}": "one"}
+        if tag == "":
+            sums.update({"pinned_shots": "shots", "pinned_danger": "danger"})
+        pinned_pieces.append(both(spells, sums))
 
     # --- candidate 3) own-zone turnovers: the team's own-zone giveaways plus the pucks the opponent took off it there ---
-    stripped = p[~p["mine"] & five & p["type"].eq("takeaway") & p["zone_T"].eq("D")].groupby(["game_id", "T"]).size().rename("stripped").reset_index()
+    stripped = both(p[~p["mine"] & five & p["type"].eq("takeaway") & p["zone_T"].eq("D")], {"stripped": "one"})
 
     # --- candidate 4) defence to offence: own-zone puck wins (faceoff win, takeaway, blocked shot, opponent's missed shot)
-    #     that become the team's own shot attempt within D2O_WINDOW seconds, before play stops ---
+    #     that become the team's own shot attempt within D2O_WINDOW seconds, before play stops (also with a shorter and a longer window) ---
     wins = p[five & p["zone_T"].eq("D") & ((p["mine"] & p["type"].isin(["faceoff", "takeaway"]))
-                                           | (~p["mine"] & p["type"].isin(["blocked-shot", "missed-shot"])))][["game_id", "T", "sort_order", "abs_t"]]
+                                           | (~p["mine"] & p["type"].isin(["blocked-shot", "missed-shot"])))][["game_id", "T", "sort_order", "abs_t", "close", "one"]]
     own_shots = p[p["mine"] & p["type"].isin(SHOT_TYPES)]
     d = forward_match(forward_match(wins, own_shots, "shot"), p[p["type"].isin(STOP_TYPES)], "stop")
-    d["d2o_ok"] = d["shot_so"].notna() & ((d["shot_t"] - d["abs_t"]) <= D2O_WINDOW) & (d["stop_so"].isna() | (d["shot_so"] < d["stop_so"]))
-    d2o_stats = d.groupby(["game_id", "T"]).agg(d2o_starts=("d2o_ok", "size"), d2o_ok=("d2o_ok", "sum")).reset_index()
+    reached = d["shot_so"].notna() & (d["stop_so"].isna() | (d["shot_so"] < d["stop_so"]))
+    sums = {"d2o_starts": "one"}
+    for seconds, tag in D2O_WINDOWS:
+        d[f"d2o_ok{tag}"] = reached & ((d["shot_t"] - d["abs_t"]) <= seconds)
+        sums[f"d2o_ok{tag}"] = f"d2o_ok{tag}"
+    d2o_stats = both(d, sums)
 
     out = exit_stats
-    for piece in (give_stats, shots_for, shots_against, icing_stats, pinned_stats, stripped, d2o_stats):
+    for piece in [give_stats, shots_for, shots_against, icing_stats, stripped, d2o_stats] + pinned_pieces:
         out = out.merge(piece, on=["game_id", "T"], how="outer")
-    out = out.fillna(0)
+    out = out.fillna(0).merge(clock, on="game_id", how="left")
     out["T"] = out["T"].astype(int)
     return out.rename(columns={"T": "team_id"})
 
 
-def load_game_rows(pbp, nhl, only=None):
+def load_game_rows(pbp, nhl, only=None, lockbox=False):
     """
     Reads every fully downloaded season and returns (one row per team per game, the seasons used, the flagged odd seasons),
-    or None if no season is ready. `only` is an optional comma-separated list of season ids. Also used by build_breakout_search.py.
+    or None if no season is ready. `only` is an optional comma-separated list of season ids.
+    The five LOCKBOX seasons are left alone unless lockbox=True, which reads ONLY those (the blind test).
+    The per-game counts of each season are saved in data/breakout/ so later runs do not have to rebuild them.
     """
     coverage = season_coverage(pbp, nhl)
-    usable = [int(s) for s in coverage.loc[coverage["coverage"] >= MIN_COVERAGE, "season_id"]]
-    if only:
-        usable = [s for s in usable if s in {int(x) for x in only.split(",")}]
     flags = pd.read_csv(PROJECT_FOLDER / "reference" / "season_flags.csv")
     odd_seasons = set(int(s) for s in flags.loc[flags["include_main"] == "N", "season_id"])
     current = int(coverage["season_id"].max())
-    usable = [s for s in usable if s != current]
+    ready = [int(s) for s in coverage.loc[coverage["coverage"] >= MIN_COVERAGE, "season_id"] if int(s) != current]
+    usable = [s for s in ready if (s in LOCKBOX) == lockbox]
+    if only:
+        usable = [s for s in usable if s in {int(x) for x in only.split(",")}]
     print("Season coverage of the play-by-play download:")
     for r in coverage.itertuples():
-        mark = "USED" if r.season_id in usable else ("in progress" if r.season_id == current else "")
+        if r.season_id in usable:
+            mark = "USED"
+        elif r.season_id == current:
+            mark = "in progress"
+        elif r.season_id in LOCKBOX and not lockbox:
+            mark = "kept back for the blind test"
+        else:
+            mark = ""
         print(f"  {season_label(r.season_id)}: {int(r.saved):,} of {int(r.played):,} games ({r.coverage:.0%})  {mark}")
     if not usable:
         print("No season is fully downloaded yet. Try again later.")
         return None
 
+    folder = PROJECT_FOLDER / "data" / "breakout"
+    folder.mkdir(parents=True, exist_ok=True)
+    saved_games = {int(r.season_id): int(r.saved) for r in coverage.itertuples()}
     pieces, blocked_checks = [], []
     for season in usable:
-        ev = load_events(pbp, season)
-        blocked_checks.append(check_blocked_shot_view(ev))
-        pieces.append(team_game_stats(ev).assign(season_id=season))
-        print(f"  {season_label(season)}: {ev['game_id'].nunique():,} games, {len(ev):,} events processed")
+        stamp = f"v{FEATURES_VERSION}_{EXIT_CAP}_{FAST_EXIT}_{GIVEAWAY_WINDOW}_{TRANSITION_WINDOW}_{PINNED_GAP}_{D2O_WINDOW}_{saved_games[season]}"
+        saved = folder / f"game_rows_{season}_{stamp}.pkl"
+        if saved.exists():
+            rows, check = pd.read_pickle(saved)
+            print(f"  {season_label(season)}: {rows['game_id'].nunique():,} games (saved copy)")
+        else:
+            ev = load_events(pbp, season)
+            rows, check = team_game_stats(ev).assign(season_id=season), check_blocked_shot_view(ev)
+            pd.to_pickle((rows, check), saved)
+            print(f"  {season_label(season)}: {ev['game_id'].nunique():,} games, {len(ev):,} events processed")
+        pieces.append(rows)
+        blocked_checks.append(check)
     game_rows = add_ice_time(pd.concat(pieces, ignore_index=True), nhl)
     missing_toi = int(game_rows["toi5"].isna().sum())
     game_rows["toi5"] = game_rows["toi5"].fillna(game_rows["toi5"].median())
+    # 5-on-5 ice time in close-score moments: MoneyPuck's 5-on-5 time, split by the share of the events' clock that was close
+    game_rows["toi5_c"] = game_rows["toi5"] * (game_rows["ev5_c"] / game_rows["ev5"]).fillna(0)
+    clock_match = float(np.corrcoef(game_rows["ev5"], game_rows["toi5"])[0, 1])
     print(f"\nCheck: blocked shots read from the shooter's side land in the offensive zone {np.nanmean(blocked_checks):.1%} of the time -> "
           f"{'PASS' if np.nanmean(blocked_checks) > 0.9 else 'CHECK'}; games without 5v5 time on ice from MoneyPuck: {missing_toi}")
+    print(f"Check: 5-on-5 time counted from the events vs MoneyPuck's: correlation {clock_match:.2f}, ratio {game_rows['ev5'].sum() / game_rows['toi5'].sum():.2f}; "
+          f"share of 5-on-5 time with the score close: {game_rows['toi5_c'].sum() / game_rows['toi5'].sum():.0%}")
     return game_rows, usable, odd_seasons
 
 
@@ -821,7 +890,7 @@ def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seaso
     edge_idx = idx["NHL zone time: share in offensive zone (5v5, 2021-22 on)"]
     d = champs.set_index("How the season ended")
     lines = [
-        ("What this is", f"A prototype of your Breakout Index on {n_seasons} fully downloaded seasons ({season_list}). Rerun when the download finishes to use every season."),
+        ("What this is", f"A prototype of your Breakout Index on {n_seasons} fully downloaded seasons ({season_list}). Seasons 2009-10 to 2013-14 are kept back for a one-time blind test of the final metric."),
         ("Does it repeat?", f"Odd-game vs even-game rank correlation (half a season each): zone exit time {rel.iloc[0]:.2f}, costly giveaways {rel.iloc[1]:.2f}, transition shots {rel.iloc[2]:.2f}, "
                             f"Breakout Index {rel.iloc[3]:.2f}. For comparison, split the same way: Corsi {rel.iloc[4]:.2f}, expected-goals share {rel.iloc[5]:.2f}, points % {rel.iloc[6]:.2f}. "
                             "Closer to 1 means more of a stable team trait and less luck."),
