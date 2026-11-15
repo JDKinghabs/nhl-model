@@ -35,12 +35,17 @@ WHAT IT DOES (in Excel terms):
       * ADDS?       does adding the index to the contender score (version 1) pick the real conference finalists
                     better, on seasons the score has never seen? (needs 8 or more seasons of play-by-play)
       * CHAMPIONS   where did champions and finalists rank?
+      * WEIGHTS?    which mix of the three stats lines up best with good teams (points % and goal difference)?
+                    Every mix in steps of 10% is tried. To stay honest the best mix is chosen on all seasons but one
+                    and scored on the season left out, then compared with plain equal weights.
 
 HOW TO RUN IT (in the terminal, from the "Model 2.0" folder):
     python scripts/build_breakout_index.py
     Safe to run while the download is still going; it uses the seasons that are fully downloaded so far.
     Rerun it when the download finishes to use every season.
     Options:  --seasons 20232024,20242025     only those seasons
+              --weights 0.5,0.2,0.3           weights for zone exit time, costly giveaways, transition shots (default: equal)
+              --exit-cap 30                   seconds after which a zone exit counts as failed (default 20)
               --force-forecast                run the hold-out test even with fewer than 8 seasons (unreliable)
 
 WHAT YOU SHOULD SEE:
@@ -87,6 +92,12 @@ COMPONENTS = [  # (column, plain name, higher is better?)
     ("costly_pg", "Costly giveaways per 60 (lower is better)", False),
     ("trans_pg", "Transition shot attempts per 60 (higher is better)", True),
 ]
+Z_COLS = [f"z_{c}" for c, _, _ in COMPONENTS]
+SHORT_NAMES = ["Zone exit time", "Costly giveaways", "Transition shots"]
+# How much each stat counts in the index, in the order above (zone exit time, costly giveaways, transition shots).
+# They are rescaled to add up to 1. Change them here, or for one run with  --weights 0.5,0.2,0.3
+WEIGHTS = (1 / 3, 1 / 3, 1 / 3)
+WEIGHT_STEP = 0.1        # the weight test tries every mix of the three weights in steps of this size
 CP_ORDER = cf.CHECKPOINTS
 PLAIN_CP = cf.PLAIN_CP
 OUTCOME_ORDER = cf.OUTCOME_ORDER
@@ -112,6 +123,9 @@ READ_ME = [
     "  Links      rank correlation with other team numbers. 0.3 is modest, 0.5 strong. Differences under about 0.1 are within noise with 30 teams a season.",
     "  Zone-time check (2021-22 on): a quick-exit team should spend LESS time in its own zone at 5v5: look for a positive link between exit time and defensive-zone time.",
     "  Hold-out test: the contender score is built on all seasons but one and used on the one it has never seen; the index must improve it to count.",
+    "  Weights    every mix of the three weights (steps of 10%) is scored by its average rank correlation with points % and goal difference. Picking the best mix on the same",
+    "             seasons it is scored on would flatter it, so the 'Weights by season' sheet picks the mix WITHOUT one season and scores it on that season. 'Beyond Corsi' is the",
+    "             link left after taking out what shot-attempt share already explains; 'Other half' uses the stats from odd games against the results of even games (and the reverse).",
     "",
     "WHAT THIS CANNOT SAY",
     "  Events are sparse (no puck possession or passes), so 'exit' means 'play was next seen outside the zone'. Giveaway and takeaway counts vary a little by arena",
@@ -242,12 +256,14 @@ def summarize(rows):
 
 
 def add_index(t):
-    """z-scores within each season (flipped so higher = better), and the equal-weight Breakout Index."""
+    """z-scores within each season (flipped so higher = better), and the Breakout Index (weighted by WEIGHTS; equal by default)."""
     t = t.copy()
     for col, _, higher in COMPONENTS:
         z = ps.zscore_by_season(t, col)
         t[f"z_{col}"] = z if higher else -z
-    raw = t[[f"z_{c}" for c, _, _ in COMPONENTS]].mean(axis=1)
+    z = t[Z_COLS]
+    w = pd.Series(WEIGHTS, index=Z_COLS) / sum(WEIGHTS)
+    raw = ((z * w).sum(axis=1, min_count=1) / (z.notna() * w).sum(axis=1)).replace([np.inf, -np.inf], np.nan)
     t["breakout"] = (raw - raw.groupby(t["season_id"]).transform("mean")) / raw.groupby(t["season_id"]).transform("std")
     t["z_breakout"] = t["breakout"].fillna(0.0)
     return t
@@ -375,8 +391,143 @@ def checkpoint_features(game_rows, nhl, checkpoints):
         d = checkpoints[checkpoints["checkpoint"] == cp][["season_id", "date"]]
         r = rows.merge(d, on="season_id")
         r = r[r["game_date"] <= r["date"]]
-        out[cp] = add_index(summarize(r))[["season_id", "team_id", "z_breakout", "breakout"]]
+        out[cp] = add_index(summarize(r))[["season_id", "team_id", "z_breakout", "breakout"] + Z_COLS]
     return out
+
+
+# ----------------------------------------------------------------------------
+# The weight test: which mix of the three stats lines up best with good teams?
+# ----------------------------------------------------------------------------
+def weight_mixes():
+    """Every mix of the three weights in steps of WEIGHT_STEP that adds up to 1, plus equal weights (always the last row)."""
+    n = int(round(1 / WEIGHT_STEP))
+    mixes = [(i / n, j / n, (n - i - j) / n) for i in range(n + 1) for j in range(n + 1 - i)]
+    return np.array(mixes + [(1 / 3, 1 / 3, 1 / 3)])
+
+
+def _rank_links(scores, target):
+    """Rank correlation of each column of `scores` with `target` (the teams of one season)."""
+    r = pd.DataFrame(np.asarray(scores)).rank().to_numpy()
+    y = pd.Series(np.asarray(target)).rank().to_numpy()
+    rc, yc = r - r.mean(axis=0), y - y.mean()
+    return (rc * yc[:, None]).sum(axis=0) / np.sqrt((rc ** 2).sum(axis=0) * (yc ** 2).sum())
+
+
+def mix_links(frame, mixes, targets):
+    """
+    For one season: how every weight mix lines up with each target. Three versions per target:
+      target            the plain rank correlation
+      target_beyond     the same after taking out what Corsi already explains (a 'partial' correlation)
+      target_corsi      Corsi's own link with the target (one number, the benchmark)
+    """
+    d = frame.dropna(subset=Z_COLS + targets + ["corsi"])
+    scores = d[Z_COLS].to_numpy() @ mixes.T
+    with_corsi = _rank_links(scores, d["corsi"])
+    out = {}
+    for t in targets:
+        raw = _rank_links(scores, d[t])
+        corsi_link = float(_rank_links(d[["corsi"]], d[t])[0])
+        out[t] = raw
+        out[f"{t}_beyond"] = (raw - with_corsi * corsi_link) / np.sqrt((1 - with_corsi ** 2) * (1 - corsi_link ** 2))
+        out[f"{t}_corsi"] = np.full(len(mixes), corsi_link)
+    return out
+
+
+def half_frames(game_rows, nhl, seasons):
+    """Two tables: the three stats from odd-numbered games next to the RESULTS of even-numbered games, and the reverse."""
+    ids = ",".join(str(int(s)) for s in seasons)
+    results = pd.read_sql_query(
+        f"SELECT season_id, game_id, team_id, points, goalsFor - goalsAgainst AS gd FROM team_games WHERE game_type = 2 AND season_id IN ({ids})", nhl)
+    bench = benchmark_halves(nhl, seasons)                               # corsi_a = odd games, corsi_b = even games
+    frames = []
+    for parity, suffix in ((1, "_a"), (0, "_b")):
+        z = add_index(summarize(game_rows[game_rows["game_id"] % 2 == parity]))[["season_id", "team_id"] + Z_COLS]
+        r = results[results["game_id"] % 2 != parity].groupby(["season_id", "team_id"]).agg(
+            pts=("points", "sum"), n=("points", "size"), gd=("gd", "sum")).reset_index()
+        r["pts_pct"], r["gd_pg"] = r["pts"] / (2 * r["n"]), r["gd"] / r["n"]
+        c = bench[["season_id", "team_id", f"corsi{suffix}"]].rename(columns={f"corsi{suffix}": "corsi"})
+        frames.append(z.merge(r[["season_id", "team_id", "pts_pct", "gd_pg"]], on=["season_id", "team_id"]).merge(c, on=["season_id", "team_id"]))
+    return frames
+
+
+def weight_test(team, game_rows, nhl, seasons):
+    """
+    Tries every mix of the three weights and asks which lines up best with good teams (points % and goal difference).
+    To stay honest the 'best' mix is CHOSEN on all seasons but one and SCORED on the season left out, then compared
+    with plain equal weights. Returns a dictionary of tables and a few numbers for the verdict.
+    """
+    mixes = weight_mixes()
+    equal = len(mixes) - 1
+    grid = slice(0, equal)                                               # the mixes that can be chosen (equal weights is the yardstick)
+    targets = ["pts_pct", "gd_pg"]
+    season_ids = sorted(int(s) for s in team["season_id"].unique() if s in set(seasons))
+    n = len(season_ids)
+
+    def stack(parts):
+        return {k: np.vstack([p[k] for p in parts]) for k in parts[0]}
+
+    same = stack([mix_links(team[team["season_id"] == s], mixes, targets + ["xg_share"]) for s in season_ids])
+    halves = half_frames(game_rows, nhl, season_ids)
+    other_parts = []
+    for s in season_ids:
+        a, b = (mix_links(h[h["season_id"] == s], mixes, targets) for h in halves)
+        other_parts.append({k: (a[k] + b[k]) / 2 for k in a})
+    other = stack(other_parts)
+
+    goal = (same["pts_pct"] + same["gd_pg"]) / 2                         # what "best" means: the average link with points % and goal difference
+    chosen = np.array([int(np.delete(goal[:, grid], i, axis=0).mean(axis=0).argmax()) for i in range(n)])
+    rows_i = np.arange(n)
+    singles = [int(np.where((np.abs(mixes[grid] - np.eye(3)[k]) < 1e-9).all(axis=1))[0][0]) for k in range(3)]
+    methods = [("Equal weights (one third each)", np.full(n, equal)), ("Best mix, chosen on the OTHER seasons", chosen)] + \
+              [(f"{SHORT_NAMES[k]} only", np.full(n, singles[k])) for k in range(3)]
+    columns = [("Same season: points %", same, "pts_pct"), ("Same season: goal difference", same, "gd_pg"),
+               ("Same season: expected-goals share", same, "xg_share"),
+               ("Same season, beyond Corsi: points %", same, "pts_pct_beyond"), ("Same season, beyond Corsi: goal difference", same, "gd_pg_beyond"),
+               ("Other half of the season: points %", other, "pts_pct"), ("Other half of the season: goal difference", other, "gd_pg"),
+               ("Other half, beyond Corsi: points %", other, "pts_pct_beyond"), ("Other half, beyond Corsi: goal difference", other, "gd_pg_beyond")]
+    summary = []
+    for name, picks in methods:
+        row = {"Weights used": name}
+        for label, source, key in columns:
+            row[label] = round(float(source[key][rows_i, picks].mean()), 2)
+        summary.append(row)
+    corsi_row = {"Weights used": "For comparison: Corsi alone"}
+    for label, source, key in columns:
+        corsi_row[label] = None if key.endswith("_beyond") else round(float(source[f"{key}_corsi"][:, 0].mean()), 2)
+    summary.append(corsi_row)
+
+    held_chosen, held_equal = goal[rows_i, chosen], goal[:, equal]
+    diff = held_chosen - held_equal
+    folds = pd.DataFrame({"Season left out": [season_label(s) for s in season_ids],
+                          "Weight chosen: zone exit time": mixes[chosen, 0], "Weight chosen: costly giveaways": mixes[chosen, 1],
+                          "Weight chosen: transition shots": mixes[chosen, 2],
+                          "Score of the chosen mix on the season left out": held_chosen.round(3),
+                          "Score of equal weights on that season": held_equal.round(3), "Difference": diff.round(3)})
+
+    table = pd.DataFrame({"Weight: zone exit time": mixes[:, 0].round(2), "Weight: costly giveaways": mixes[:, 1].round(2),
+                          "Weight: transition shots": mixes[:, 2].round(2),
+                          "Score (avg link with points % and goal difference)": goal.mean(axis=0).round(3),
+                          "Link with points %": same["pts_pct"].mean(axis=0).round(3), "Link with goal difference": same["gd_pg"].mean(axis=0).round(3),
+                          "Beyond Corsi (avg of the two)": ((same["pts_pct_beyond"] + same["gd_pg_beyond"]) / 2).mean(axis=0).round(3),
+                          "Other half of the season (avg of the two)": ((other["pts_pct"] + other["gd_pg"]) / 2).mean(axis=0).round(3),
+                          "Seasons where it beat equal weights": (goal > goal[:, [equal]]).sum(axis=0)})
+    table.insert(0, "Mix", ["equal weights" if i == equal else "" for i in range(len(mixes))])
+    table = table.sort_values("Score (avg link with points % and goal difference)", ascending=False).reset_index(drop=True)
+    table.insert(0, "Rank", np.arange(1, len(table) + 1))
+
+    all_mean = goal.mean(axis=0)
+    best = int(all_mean[grid].argmax())
+    return {"summary": pd.DataFrame(summary), "folds": folds, "grid": table, "n_mixes": equal, "n_seasons": n,
+            "best_weights": mixes[best], "best_score": float(all_mean[best]), "equal_score": float(all_mean[equal]),
+            "worst_score": float(all_mean[grid].min()), "held_chosen": float(held_chosen.mean()), "held_equal": float(held_equal.mean()),
+            "held_diff": float(diff.mean()), "held_margin": float(2 * diff.std(ddof=1) / np.sqrt(n)) if n > 1 else float("nan"),
+            "seasons_better": int((diff > 0).sum()), "avg_chosen": mixes[chosen].mean(axis=0),
+            "beyond_equal": float(((same["pts_pct_beyond"] + same["gd_pg_beyond"]) / 2)[:, equal].mean()),
+            "beyond_best": float(((same["pts_pct_beyond"] + same["gd_pg_beyond"]) / 2)[rows_i, chosen].mean()),
+            "other_equal": float(((other["pts_pct"] + other["gd_pg"]) / 2)[:, equal].mean()),
+            "other_best": float(((other["pts_pct"] + other["gd_pg"]) / 2)[rows_i, chosen].mean()),
+            "other_beyond_equal": float(((other["pts_pct_beyond"] + other["gd_pg_beyond"]) / 2)[:, equal].mean()),
+            "other_beyond_best": float(((other["pts_pct_beyond"] + other["gd_pg_beyond"]) / 2)[rows_i, chosen].mean())}
 
 
 def forecast_test(connection, game_rows, covered, force):
@@ -395,13 +546,16 @@ def forecast_test(connection, game_rows, covered, force):
         t = t[t["season_id"].isin(covered)].copy()
         if t["season_id"].nunique() < 3:
             continue
-        base = cf.held_out_scores(t, v1)
-        plus = cf.held_out_scores(t.assign(z_breakout=t["z_breakout"]), v1 + ["breakout"])
-        t["v1"], t["v1+breakout"] = base, plus
-        a, b = cf.per_season_metrics(t, "v1"), cf.per_season_metrics(t, "v1+breakout")
-        diff = b["auc"] - a["auc"]
+        t[Z_COLS] = t[Z_COLS].fillna(0.0)
+        t["v1"] = cf.held_out_scores(t, v1)
+        t["v1+breakout"] = cf.held_out_scores(t, v1 + ["breakout"])
+        t["v1+three"] = cf.held_out_scores(t, v1 + [c for c, _, _ in COMPONENTS])     # the model picks its own weight for each stat
+        a, b, c3 = cf.per_season_metrics(t, "v1"), cf.per_season_metrics(t, "v1+breakout"), cf.per_season_metrics(t, "v1+three")
+        diff, diff3 = b["auc"] - a["auc"], c3["auc"] - a["auc"]
         rows.append({"Checkpoint": PLAIN_CP[cp], "Seasons": len(diff), "AUC v1": a["auc"].mean(), "AUC v1 + Breakout Index": b["auc"].mean(),
                      "Gain": diff.mean(), "Margin (+/-, 2 std. errors)": 2 * diff.std(ddof=1) / np.sqrt(len(diff)),
+                     "AUC v1 + the three stats separately (model picks the weights)": c3["auc"].mean(),
+                     "Gain (separately)": diff3.mean(), "Margin (separately)": 2 * diff3.std(ddof=1) / np.sqrt(len(diff3)),
                      "Avg finalist rank v1": a["avg_rank_f4"].mean(), "Avg finalist rank with index": b["avg_rank_f4"].mean(),
                      "Seasons better": int((b["avg_rank_f4"] < a["avg_rank_f4"]).sum()), "Seasons worse": int((b["avg_rank_f4"] > a["avg_rank_f4"]).sum())})
     table = pd.DataFrame(rows).round(3)
@@ -410,7 +564,23 @@ def forecast_test(connection, game_rows, covered, force):
 
 
 # ----------------------------------------------------------------------------
-def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seasons, season_list):
+def weights_sentence(w):
+    pct = lambda x: f"{round(float(x) * 100):.0f}%"                       # noqa: E731
+    best, avg = w["best_weights"], w["avg_chosen"]
+    better = w["held_diff"] > w["held_margin"]
+    return (f"Tried all {w['n_mixes']} mixes of the three weights in steps of {round(WEIGHT_STEP * 100)}%, scoring each by its average link with points % and goal difference. "
+            f"Across all {w['n_seasons']} seasons the top mix is zone exit time {pct(best[0])}, costly giveaways {pct(best[1])}, transition shots {pct(best[2])} "
+            f"(score {w['best_score']:.2f}; equal weights {w['equal_score']:.2f}; the worst mix {w['worst_score']:.2f}). "
+            f"The honest check: choose the mix on all seasons but one and score it on the season left out. That gives {w['held_chosen']:.2f} against {w['held_equal']:.2f} for equal weights "
+            f"(difference {w['held_diff']:+.2f}, noise margin about +/-{w['held_margin']:.2f}, better in {w['seasons_better']} of {w['n_seasons']} seasons); "
+            f"the mix chosen averaged {pct(avg[0])} / {pct(avg[1])} / {pct(avg[2])}. "
+            + ("The chosen weights beat equal weights by more than the noise." if better else
+               "That is within the noise: re-weighting does not reliably beat equal weights.")
+            + f" After taking out what Corsi already explains, the link is {w['beyond_best']:+.2f} with the chosen mix and {w['beyond_equal']:+.2f} with equal weights. "
+              f"Predicting the OTHER half of the same season: {w['other_best']:+.2f} (chosen) and {w['other_equal']:+.2f} (equal); beyond Corsi {w['other_beyond_best']:+.2f} and {w['other_beyond_equal']:+.2f}.")
+
+
+def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seasons, season_list, weights=None):
     rel = reliab.set_index("Statistic")["Repeats: odd vs even games"]
     link = links.set_index("Breakout statistic")
     idx = link.loc["Breakout Index (higher is better)"]
@@ -429,6 +599,7 @@ def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seaso
                                              "It overlaps with Corsi to a real degree (about 0.3 to 0.5 is moderate), so it may add little beyond it. The contender test below is the real check.")),
         ("Does it match the NHL's real zone time?", (f"Zone exit time vs share of 5v5 time in the team's own zone: {edge_exit:+.2f} (positive is what we expect: slow exits, more time in your own end). "
                                                       f"Breakout Index vs offensive-zone share: {edge_idx:+.2f}.") if pd.notna(edge_exit) else "Not testable yet: no 2021-22-or-later seasons have finished downloading."),
+        ("Which weights work best?", weights_sentence(weights) if weights else "Not run."),
         ("Does it improve the contender score?", forecast_note + (" " + _forecast_sentence(forecast) if len(forecast) else "")),
         ("Champions", f"Average Breakout Index percentile: Won Cup {d.loc['Won Cup', 'Breakout Index (percentile)']:.0f}, Lost Cup final {d.loc['Lost Cup final', 'Breakout Index (percentile)']:.0f}, "
                       f"Missed playoffs {d.loc['Missed playoffs', 'Breakout Index (percentile)']:.0f} (100 = best, 50 = average)." if "Won Cup" in d.index else "No champions in the seasons downloaded so far."),
@@ -438,8 +609,11 @@ def verdict_lines(reliab, links, level, forecast, forecast_note, champs, n_seaso
 
 def _forecast_sentence(forecast):
     gain, margin = forecast["Gain"].mean(), forecast["Margin (+/-, 2 std. errors)"].mean()
+    gain3, margin3 = forecast["Gain (separately)"].mean(), forecast["Margin (separately)"].mean()
     return (f"Adding the index to version 1 changes the average AUC by {gain:+.3f} (margin about +/-{margin:.3f}): "
-            + ("larger than the noise." if gain > margin else "within the noise."))
+            + ("larger than the noise." if gain > margin else "within the noise.")
+            + f" Letting the model pick its own weight for each of the three stats changes it by {gain3:+.3f} (margin about +/-{margin3:.3f}): "
+            + ("larger than the noise." if gain3 > margin3 else "within the noise."))
 
 
 def write_excel(sheets, notes):
@@ -474,14 +648,22 @@ def write_excel(sheets, notes):
 
 
 def main():
-    global EXIT_CAP                                                      # so --exit-cap can change the setting for the whole run
+    global EXIT_CAP, WEIGHTS                                             # so --exit-cap and --weights can change the settings for the whole run
     sys.stdout.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description="Build the Breakout Index from play-by-play.")
     parser.add_argument("--seasons", help="comma-separated season ids to use, e.g. 20232024,20242025")
     parser.add_argument("--force-forecast", action="store_true", help="run the hold-out test with fewer than 8 seasons (unreliable)")
     parser.add_argument("--exit-cap", type=int, default=EXIT_CAP, help=f"seconds after which a zone exit counts as failed (default {EXIT_CAP})")
+    parser.add_argument("--weights", help="weights for zone exit time, costly giveaways, transition shots, e.g. 0.5,0.2,0.3 (default: equal)")
     args = parser.parse_args()
     EXIT_CAP = args.exit_cap
+    if args.weights:
+        try:
+            WEIGHTS = tuple(float(x) for x in args.weights.split(","))
+            assert len(WEIGHTS) == 3 and min(WEIGHTS) >= 0 and sum(WEIGHTS) > 0
+        except (ValueError, AssertionError):
+            print("--weights needs three numbers that are zero or more, separated by commas, for example  --weights 0.5,0.2,0.3")
+            return 1
     if not PBP_DB.exists() or not NHL_DB.exists():
         print("I need data/pbp.db (python scripts/pull_play_by_play.py) and data/nhl.db (python scripts/build_database.py).")
         return 1
@@ -530,7 +712,10 @@ def main():
     champs = champion_profile(team[team["include_main"].fillna("Y") == "Y"])
     forecast, note = forecast_test(nhl, game_rows[game_rows["season_id"].isin([s for s in usable if s not in odd_seasons])],
                                    [s for s in usable if s not in odd_seasons], args.force_forecast)
-    verdict = verdict_lines(reliab, links, level, forecast, note, champs, len(usable), ", ".join(season_label(s) for s in usable))
+    weights = weight_test(main_team, game_rows, nhl, [s for s in usable if s not in odd_seasons]) if len(usable) >= 3 else None
+    verdict = verdict_lines(reliab, links, level, forecast, note, champs, len(usable), ", ".join(season_label(s) for s in usable), weights)
+    used = " / ".join(f"{w / sum(WEIGHTS):.0%}" for w in WEIGHTS)
+    print(f"Weights used for the index in this run (zone exit time / costly giveaways / transition shots): {used}")
 
     out = team.sort_values(["season_id", "breakout"], ascending=[False, False])
     teams_out = pd.DataFrame({
@@ -545,6 +730,13 @@ def main():
     sheets = {"Verdict": verdict, "Repeats": reliab, "Links": links, "Between the three": internal, "Level by season": level,
               "Champions": champs, "Contender test": forecast if len(forecast) else pd.DataFrame({"": [note]}), "Team-seasons": teams_out}
     notes = {"Links": "Rank correlation (within each season, averaged) between each breakout statistic and other team numbers. Positive is expected for the index; for exit time and costly giveaways negative is 'good'."}
+    if weights:
+        sheets = {"Verdict": verdict, "Weights": weights["summary"], "Weights by season": weights["folds"], "Weight grid": weights["grid"],
+                  **{k: v for k, v in sheets.items() if k != "Verdict"}}
+        notes["Weights"] = ("How well each way of weighting the three stats lines up with good teams (rank correlation, averaged over seasons; higher is better). "
+                            "'Beyond Corsi' = after taking out what shot-attempt share already explains. 'Other half' = stats from odd games vs results in even games, and the reverse.")
+        notes["Weights by season"] = "The honest check: the best mix is chosen WITHOUT the season on that row, then scored on it. If the chosen weights jump around from row to row, no mix is clearly best."
+        notes["Weight grid"] = "Every mix tried, best first, using all seasons at once (this flatters the top rows a little: the 'Weights by season' sheet is the fair test)."
     try:
         write_excel(sheets, notes)
     except PermissionError:
@@ -561,6 +753,12 @@ def main():
     print("\nLinks:"); print(links.to_string(index=False))
     print("\nBetween the three stats:"); print(internal.to_string(index=False))
     print("\nChampions:"); print(champs.to_string(index=False))
+    if weights:
+        print("\nWeights: how each weighting lines up with good teams:"); print(weights["summary"].T.to_string(header=False))
+        print("\nWeights chosen when each season is left out:"); print(weights["folds"].to_string(index=False))
+        print("\nTop 8 mixes on all seasons (and where equal weights ranks):")
+        g = weights["grid"]
+        print(pd.concat([g.head(8), g[g["Mix"] == "equal weights"], g.tail(3)]).drop_duplicates().to_string(index=False))
     if len(forecast):
         print("\nContender test:"); print(forecast.to_string(index=False))
     print("\nTop 5 and bottom 3 of the latest season:")
