@@ -131,6 +131,17 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     cap, the 10-second costly-giveaway window, the 5-second transition window, the three weights) are settings at the
     top of the script; `--weights 0.5,0.2,0.3` tries other weights for one run.
 
+12. Do breakouts make teams good? (needs the same data as step 11): takes 11 breakout stats, makes every
+    combination of them (2,047), and asks whether the best one goes with winning, predicts games it has not seen,
+    carries into next season, and is more than shot share. To avoid fooling ourselves, the best combination is
+    always chosen on all seasons but one and scored on the one left out, and the whole search is repeated on
+    1,000 random shuffles of the results to measure luck. Tougher checks repeat it with puck-movement stats only
+    (no shot counts) and after taking out shot quality:
+    ```
+    python scripts/build_breakout_search.py
+    ```
+    The workbook is `outputs/breakout_search.xlsx`: start with its "Verdict" sheet.
+
 ## The play-by-play download (overnight)
 
 Every NHL game has a play-by-play: one row per event (faceoff, shot, hit, giveaway, takeaway, penalty, goal) with the

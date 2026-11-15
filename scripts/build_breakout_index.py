@@ -320,6 +320,41 @@ def team_game_stats(ev):
     return out.rename(columns={"T": "team_id"})
 
 
+def load_game_rows(pbp, nhl, only=None):
+    """
+    Reads every fully downloaded season and returns (one row per team per game, the seasons used, the flagged odd seasons),
+    or None if no season is ready. `only` is an optional comma-separated list of season ids. Also used by build_breakout_search.py.
+    """
+    coverage = season_coverage(pbp, nhl)
+    usable = [int(s) for s in coverage.loc[coverage["coverage"] >= MIN_COVERAGE, "season_id"]]
+    if only:
+        usable = [s for s in usable if s in {int(x) for x in only.split(",")}]
+    flags = pd.read_csv(PROJECT_FOLDER / "reference" / "season_flags.csv")
+    odd_seasons = set(int(s) for s in flags.loc[flags["include_main"] == "N", "season_id"])
+    current = int(coverage["season_id"].max())
+    usable = [s for s in usable if s != current]
+    print("Season coverage of the play-by-play download:")
+    for r in coverage.itertuples():
+        mark = "USED" if r.season_id in usable else ("in progress" if r.season_id == current else "")
+        print(f"  {season_label(r.season_id)}: {int(r.saved):,} of {int(r.played):,} games ({r.coverage:.0%})  {mark}")
+    if not usable:
+        print("No season is fully downloaded yet. Try again later.")
+        return None
+
+    pieces, blocked_checks = [], []
+    for season in usable:
+        ev = load_events(pbp, season)
+        blocked_checks.append(check_blocked_shot_view(ev))
+        pieces.append(team_game_stats(ev).assign(season_id=season))
+        print(f"  {season_label(season)}: {ev['game_id'].nunique():,} games, {len(ev):,} events processed")
+    game_rows = add_ice_time(pd.concat(pieces, ignore_index=True), nhl)
+    missing_toi = int(game_rows["toi5"].isna().sum())
+    game_rows["toi5"] = game_rows["toi5"].fillna(game_rows["toi5"].median())
+    print(f"\nCheck: blocked shots read from the shooter's side land in the offensive zone {np.nanmean(blocked_checks):.1%} of the time -> "
+          f"{'PASS' if np.nanmean(blocked_checks) > 0.9 else 'CHECK'}; games without 5v5 time on ice from MoneyPuck: {missing_toi}")
+    return game_rows, usable, odd_seasons
+
+
 def check_blocked_shot_view(ev):
     """Sanity check: read from the shooter's side, blocked shots should be taken in the offensive zone."""
     b = ev[ev["type"] == "blocked-shot"]
@@ -870,33 +905,10 @@ def main():
         print("The MoneyPuck tables are missing (they give 5-on-5 time on ice). Run: python scripts/load_moneypuck.py")
         return 1
 
-    coverage = season_coverage(pbp, nhl)
-    usable = [int(s) for s in coverage.loc[coverage["coverage"] >= MIN_COVERAGE, "season_id"]]
-    if args.seasons:
-        usable = [s for s in usable if s in {int(x) for x in args.seasons.split(",")}]
-    flags = pd.read_csv(PROJECT_FOLDER / "reference" / "season_flags.csv")
-    odd_seasons = set(int(s) for s in flags.loc[flags["include_main"] == "N", "season_id"])
-    current = int(coverage["season_id"].max())
-    usable = [s for s in usable if s != current]
-    print("Season coverage of the play-by-play download:")
-    for r in coverage.itertuples():
-        mark = "USED" if r.season_id in usable else ("in progress" if r.season_id == current else "")
-        print(f"  {season_label(r.season_id)}: {int(r.saved):,} of {int(r.played):,} games ({r.coverage:.0%})  {mark}")
-    if not usable:
-        print("No season is fully downloaded yet. Try again later.")
+    loaded = load_game_rows(pbp, nhl, args.seasons)
+    if loaded is None:
         return 1
-
-    pieces, blocked_checks = [], []
-    for season in usable:
-        ev = load_events(pbp, season)
-        blocked_checks.append(check_blocked_shot_view(ev))
-        pieces.append(team_game_stats(ev).assign(season_id=season))
-        print(f"  {season_label(season)}: {ev['game_id'].nunique():,} games, {len(ev):,} events processed")
-    game_rows = add_ice_time(pd.concat(pieces, ignore_index=True), nhl)
-    missing_toi = int(game_rows["toi5"].isna().sum())
-    game_rows["toi5"] = game_rows["toi5"].fillna(game_rows["toi5"].median())
-    print(f"\nCheck: blocked shots read from the shooter's side land in the offensive zone {np.nanmean(blocked_checks):.1%} of the time -> "
-          f"{'PASS' if np.nanmean(blocked_checks) > 0.9 else 'CHECK'}; games without 5v5 time on ice from MoneyPuck: {missing_toi}")
+    game_rows, usable, odd_seasons = loaded
 
     team = add_index(summarize(game_rows))
     compare = comparison_numbers(nhl, usable)
