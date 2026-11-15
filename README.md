@@ -115,6 +115,16 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     python scripts/build_contender_fit_v2.py
     ```
     The workbook is `outputs/contender_fit_v2.xlsx`: start with its "Verdict" sheet.
+11. Breakout Index (needs the play-by-play download and the MoneyPuck tables): builds three "getting out of your own
+    end" statistics from the play-by-play at 5-on-5 (zone exit time, costly giveaways, transition shots), blends them
+    into one index, and tests whether it repeats, whether it lines up with the NHL's real zone time and with winning,
+    and whether it improves the contender score on seasons the score has never seen. It uses only seasons that are
+    fully downloaded, so it can be run while the download is still going and rerun when it has finished:
+    ```
+    python scripts/build_breakout_index.py
+    ```
+    The workbook is `outputs/breakout_index.xlsx`: start with its "Verdict" sheet. The definitions (the 20-second exit
+    cap, the 10-second costly-giveaway window, the 5-second transition window) are settings at the top of the script.
 
 ## The play-by-play download (overnight)
 
