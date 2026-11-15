@@ -135,7 +135,22 @@ D2O_WINDOWS = [(D2O_WINDOW, ""), (10, "10"), (30, "30")]     # the normal window
 #      metric the search ends up with can be tried on them ONCE (build_breakout_round2.py --blind-test). Do not remove a season
 #      from this list to "have a look": a peek spends the only clean test we have. ----
 LOCKBOX = [20092010, 20102011, 20112012, 20122013, 20132014]
-FEATURES_VERSION = 2     # raise this when team_game_stats changes, so saved copies of its output are rebuilt
+FEATURES_VERSION = 3     # raise this when team_game_stats changes, so saved copies of its output are rebuilt
+
+# ---- BER, "breakout efficiency rating":  100 x (controlled exits + 0.5 x safe clears) / breakout attempts ----
+# The play-by-play does not say who has the puck, so each breakout attempt (an own-zone puck win at 5-on-5) is judged by the
+# FIRST telling event after it, if that comes within BER_WINDOW seconds:
+#   CONTROLLED EXIT  an event beyond our blue line that shows WE had the puck there: our shot attempt, our giveaway,
+#                    a hit on our player, or the opponent taking the puck off us.
+#   SAFE CLEAR       an event beyond our blue line that shows THEY had the puck there: their giveaway or shot, our hit on them,
+#                    our takeaway, or the opponent icing it. It only counts as safe if nothing below happens within
+#                    SAFE_CLEAR_WINDOW seconds (otherwise the puck came straight back: failed).
+#   FAILED           something in our zone that shows we did not get out: a shot attempt against, our giveaway, the puck taken
+#                    off us, our own takeaway or hit there (they had it again), or our icing.
+#   CANNOT BE JUDGED a stoppage, a change of strength or nothing telling within the window. These are left OUT of the
+#                    denominator: with no event to go on, calling them failures would just measure how few events were recorded.
+BER_WINDOW = 20
+SAFE_CLEAR_WINDOW = 10
 CANDIDATES = [  # (column, plain name, higher is better?)
     ("icing_pg", "Icings per 60 (lower is better)", False),
     ("pinned_pg", "Pinned-in spells per 60 (lower is better)", False),
@@ -322,6 +337,7 @@ def team_game_stats(ev):
     # --- candidate 2) pinned-in spells: 2+ opponent shot attempts in a row, each within PINNED_GAP seconds, play never leaving the zone.
     #     Also counted with a shorter and a longer gap, and the DANGEROUS ones (a spell with an unblocked shot from the slot). ---
     p = p.sort_values(["game_id", "T", "sort_order"]).reset_index(drop=True)
+    p = p.merge(ic[["game_id", "sort_order", "T"]].rename(columns={"T": "icing_team"}), on=["game_id", "sort_order"], how="left")   # who iced it (5-on-5 icings)
     five = p["situation_code"] == FIVE_ON_FIVE
     opp_shot_in_zone = ~p["mine"] & p["type"].isin(SHOT_TYPES) & p["zone_T"].eq("D") & five
     breaks = p["type"].isin(STOP_TYPES + ["faceoff", "period-start"]) | p["zone_T"].isin(["N", "O"]) | ~five
@@ -356,8 +372,30 @@ def team_game_stats(ev):
         sums[f"d2o_ok{tag}"] = f"d2o_ok{tag}"
     d2o_stats = both(d, sums)
 
+    # --- BER: each own-zone puck win judged by the first telling event after it (see the BER notes at the top of this file) ---
+    out_of_zone, in_zone = p["zone_T"].isin(["N", "O"]), p["zone_T"].eq("D")
+    mine, theirs, kind = p["mine"], ~p["mine"], p["type"]
+    we_had_it_out = out_of_zone & ((mine & kind.isin(SHOT_TYPES)) | (mine & kind.eq("giveaway")) | (theirs & kind.eq("hit")) | (theirs & kind.eq("takeaway")))
+    they_had_it_out = (out_of_zone & ((theirs & kind.eq("giveaway")) | (theirs & kind.isin(SHOT_TYPES)) | (mine & kind.eq("hit")) | (mine & kind.eq("takeaway")))
+                       ) | (p["icing_team"].notna() & p["icing_team"].ne(p["T"]))
+    still_in = (in_zone & ((theirs & kind.isin(SHOT_TYPES)) | (mine & kind.eq("giveaway")) | (theirs & kind.eq("takeaway"))
+                           | (mine & kind.eq("takeaway")) | (mine & kind.eq("hit")))) | p["icing_team"].eq(p["T"])
+    play_ended = kind.isin(STOP_TYPES + ["period-start"]) | ~five
+    b = wins
+    for name, mask in (("ctrl", we_had_it_out), ("clear", they_had_it_out), ("fail", still_in), ("end", play_ended)):
+        b = forward_match(b, p[mask], name)
+    order = b[["ctrl_so", "clear_so", "fail_so", "end_so"]].fillna(np.inf).to_numpy()
+    first = order.argmin(axis=1)                                         # a tie (an icing is also a stoppage) goes to the earlier column
+    when = b[["ctrl_t", "clear_t", "fail_t", "end_t"]].to_numpy()[np.arange(len(b)), first]
+    in_time = np.isfinite(order.min(axis=1)) & ((when - b["abs_t"].to_numpy()) <= BER_WINDOW)
+    came_back = (b["fail_so"].notna() & ((b["fail_t"] - b["clear_t"]) <= SAFE_CLEAR_WINDOW) & (b["end_so"].isna() | (b["fail_so"] < b["end_so"]))).to_numpy()
+    b["ber_ctrl"] = in_time & (first == 0)
+    b["ber_safe"] = in_time & (first == 1) & ~came_back
+    b["ber_fail"] = in_time & ((first == 2) | ((first == 1) & came_back))
+    ber_stats = both(b, {"ber_attempts": "one", "ber_ctrl": "ber_ctrl", "ber_safe": "ber_safe", "ber_fail": "ber_fail"})
+
     out = exit_stats
-    for piece in [give_stats, shots_for, shots_against, icing_stats, stripped, d2o_stats] + pinned_pieces:
+    for piece in [give_stats, shots_for, shots_against, icing_stats, stripped, d2o_stats, ber_stats] + pinned_pieces:
         out = out.merge(piece, on=["game_id", "T"], how="outer")
     out = out.fillna(0).merge(clock, on="game_id", how="left")
     out["T"] = out["T"].astype(int)

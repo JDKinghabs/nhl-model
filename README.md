@@ -143,7 +143,8 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     The workbook is `outputs/breakout_search.xlsx`: start with its "Verdict" sheet.
 13. The search for the right breakout metric, round 2, and the blind test. Every stat is also built from close-score
     moments only and as a "battle" (ours minus the opponent's in the same games), with a few tuned time windows:
-    64 building blocks, every combination of up to four (about 679,000), plus a data-weighted version. The best
+    plus BER (100 x (controlled exits + 0.5 x safe clears) / breakout attempts, read from events as well as they
+    allow): 68 building blocks, every combination of up to four (about 867,000), plus a data-weighted version. The best
     recipe for "our own breakouts" and the best "breakout battle" recipe are frozen in
     `reference/breakout_metric_frozen.json`:
     ```

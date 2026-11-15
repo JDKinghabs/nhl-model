@@ -6,7 +6,7 @@ WHAT IT DOES (in Excel terms):
     well as Corsi, but does not beat it. This round widens the search in four directions that each have a hockey
     reason, then FREEZES the winner so it can be tried once on five seasons that no test has ever touched.
 
-    THE FOUR NEW DIRECTIONS
+    THE NEW DIRECTIONS
       * CLOSE GAMES ONLY     a team sitting on a lead lets itself be pinned in, which muddies the stats. Every stat is
                              also built from close-score moments only (within one goal in periods 1-2, tied after).
       * THE BREAKOUT BATTLE  ours minus the opponent's in the same games: the pinned-in spells we suffer against the
@@ -16,8 +16,11 @@ WHAT IT DOES (in Excel terms):
       * DATA-SET WEIGHTS     instead of a plain average, let the data weight the stats (a "ridge regression": like
                              LINEST, but it shrinks the weights so a few seasons cannot push them to extremes).
 
-    That gives 64 building blocks (16 stats x 4 forms: ours / ours in close games / battle / battle in close games)
-    and every combination of up to four of them: about 679,000 breakout scores.
+          * BER                  your breakout efficiency rating, 100 x (controlled exits + 0.5 x safe clears) / breakout attempts,
+                             read from events as well as they allow (the definitions are at the top of build_breakout_index.py).
+
+    That gives 68 building blocks (17 stats x 4 forms: ours / ours in close games / battle / battle in close games)
+    and every combination of up to four of them: about 867,000 breakout scores.
 
     TWO WINNERS ARE FROZEN, BY A RULE FIXED IN ADVANCE
       "Our own breakouts"   the best score built only from our own stats (no battle blocks): the pure test of the belief.
@@ -85,6 +88,7 @@ STATS = [  # (key, short name, higher is better?)
     ("d2o10_rate", "Defence-to-offence (10 s)", True),
     ("d2o30_rate", "Defence-to-offence (30 s)", True),
     ("trans_slot_share", "Transition shot quality", True),
+    ("ber", "BER (breakout efficiency)", True),
 ]
 FORMS = [  # (key, close-score only?, battle?, label)
     ("own", False, False, "ours"),
@@ -114,8 +118,8 @@ READ_ME = [
     "The search for the right breakout metric, round 2",
     "",
     "WHAT WAS DONE",
-    "  16 breakout stats, each in four forms (ours / ours in close games / battle = ours minus the opponent's / battle in close games) = 64 building blocks.",
-    "  Every combination of up to four blocks (about 679,000) was turned into a score (the plain average of its blocks) and judged on how well it PREDICTS UNSEEN GAMES:",
+    "  17 breakout stats, each in four forms (ours / ours in close games / battle = ours minus the opponent's / battle in close games) = 68 building blocks.",
+    "  Every combination of up to four blocks (about 867,000) was turned into a score (the plain average of its blocks) and judged on how well it PREDICTS UNSEEN GAMES:",
     "  the stats from odd-numbered games against the results of even-numbered games, and the reverse. A data-weighted version (ridge regression) was tried as well.",
     "",
     "HOW TO READ THE NUMBERS",
@@ -160,6 +164,8 @@ def raw_stats(g, close, side):
         "turnover_pg": (c("giveaways") + c("stripped")) / hours,
         "d2o_rate": c("d2o_ok") / c("d2o_starts"), "d2o10_rate": c("d2o_ok10") / c("d2o_starts"), "d2o30_rate": c("d2o_ok30") / c("d2o_starts"),
         "trans_slot_share": c("trans_slot") / c("trans_unblocked"),
+        # BER = 100 x (controlled exits + 0.5 x safe clears) / breakout attempts that could be judged
+        "ber": 100 * (c("ber_ctrl") + 0.5 * c("ber_safe")) / (c("ber_ctrl") + c("ber_safe") + c("ber_fail")),
     }
 
 
@@ -436,10 +442,26 @@ def build_parts(rows, nhl, seasons, with_next=False):
     return full_parts, half_parts, next_parts
 
 
+def block_repeats(rows):
+    """How well each block repeats: its ranking of the teams from odd-numbered games against the ranking from even-numbered games."""
+    rows = with_opponent(rows)
+    m = block_table(rows[rows["game_id"] % 2 == 1]).merge(block_table(rows[rows["game_id"] % 2 == 0]), on=["season_id", "team_id"], suffixes=("_a", "_b"))
+    return [float(m.groupby("season_id").apply(lambda d, b=b: d[f"{b}_a"].rank().corr(d[f"{b}_b"].rank())).mean()) for b in BLOCKS]
+
+
+def ber_breakdown(rows):
+    """What became of the breakout attempts: the shares that were controlled exits, safe clears, failed, or could not be judged."""
+    s = rows[["ber_attempts", "ber_ctrl", "ber_safe", "ber_fail"]].sum()
+    judged = s["ber_ctrl"] + s["ber_safe"] + s["ber_fail"]
+    return {"attempts_per_team_game": float(s["ber_attempts"] / len(rows)), "judged": float(judged / s["ber_attempts"]),
+            "controlled": float(s["ber_ctrl"] / judged), "safe": float(s["ber_safe"] / judged), "failed": float(s["ber_fail"] / judged),
+            "league_ber": float(100 * (s["ber_ctrl"] + 0.5 * s["ber_safe"]) / judged)}
+
+
 def settings_now():
     return {"EXIT_CAP": bi.EXIT_CAP, "FAST_EXIT": bi.FAST_EXIT, "GIVEAWAY_WINDOW": bi.GIVEAWAY_WINDOW, "TRANSITION_WINDOW": bi.TRANSITION_WINDOW,
             "PINNED_GAP": bi.PINNED_GAP, "D2O_WINDOW": bi.D2O_WINDOW, "SLOT_HALF_WIDTH": bi.SLOT_HALF_WIDTH, "SLOT_DEPTH": bi.SLOT_DEPTH,
-            "FEATURES_VERSION": bi.FEATURES_VERSION}
+            "BER_WINDOW": bi.BER_WINDOW, "SAFE_CLEAR_WINDOW": bi.SAFE_CLEAR_WINDOW, "FEATURES_VERSION": bi.FEATURES_VERSION}
 
 
 # ----------------------------------------------------------------------------
@@ -600,6 +622,7 @@ def main():
     single = np.arange(len(BLOCKS))                                       # the first combinations are the single blocks, in order
     top200 = np.argsort(-every["other"])[:200]
     blocks = pd.DataFrame({"Block": BLOCK_NAMES, "Form": [label for _ in STATS for _, _, _, label in FORMS],
+                           "Repeats (odd vs even games)": np.round(block_repeats(rows), 2),
                            "On its own: predicts unseen games": every["other"][single].round(3), "On its own: goes with winning": every["same"][single].round(3),
                            "On its own: beyond Corsi": every["beyond"][single].round(3), "On its own: beyond Corsi and expected goals": every["beyond2"][single].round(3)})
     member = np.zeros((len(BLOCKS), total), dtype=bool)
@@ -624,7 +647,7 @@ def main():
                          **{f"{name} (all search seasons)": round(float(every[q][i]), 3) for q, name in QUESTIONS}})
     tops = pd.DataFrame(tops)
 
-    lines = [("What was done", f"{len(BLOCKS)} building blocks (16 stats, each as ours / ours in close games / battle / battle in close games), every combination of up to {args.max_size}: "
+    lines = [("What was done", f"{len(BLOCKS)} building blocks ({len(STATS)} stats, each as ours / ours in close games / battle / battle in close games), every combination of up to {args.max_size}: "
                                f"{total:,} breakout scores on {len(seasons)} seasons ({', '.join(labels)}). Yardsticks for predicting unseen games: Corsi {corsi:+.2f}, expected-goals share {xg:+.2f}.")]
     for tier, label in TIERS:
         t = tiers[tier]
@@ -635,6 +658,14 @@ def main():
                              f"Data-set weights instead of a plain average: {t['ridge']['other'].mean():+.2f}, "
                              + ("better by more than 0.02, so the weighted version is frozen." if t["use_ridge"] else "not better by more than 0.02, so the plain average is kept.")
                              + f" FROZEN RECIPE: {recipe_name(t['weights'])}."))
+    ber, ber_rows = ber_breakdown(rows), blocks[blocks["Block"].str.startswith("BER")]
+    in_frozen = [label for tier, label in TIERS if any(b.startswith("ber|") for b in tiers[tier]["weights"]) and not tiers[tier]["use_ridge"]]
+    lines.append(("BER (your formula, read from events)",
+                  f"{ber['attempts_per_team_game']:.0f} breakout attempts per team per game; {ber['judged']:.0%} of them could be judged. Of those: controlled exit {ber['controlled']:.0%}, "
+                  f"safe clear {ber['safe']:.0%}, failed {ber['failed']:.0%}; league-average BER {ber['league_ber']:.0f}. "
+                  + " | ".join(f"{r['Form']}: repeats {r['Repeats (odd vs even games)']:.2f}, predicts unseen games {r['On its own: predicts unseen games']:+.2f}, goes with winning "
+                               f"{r['On its own: goes with winning']:+.2f}, beyond Corsi and expected goals {r['On its own: beyond Corsi and expected goals']:+.2f}" for _, r in ber_rows.iterrows())
+                  + (f". It is part of the frozen plain-average recipe for: {', '.join(in_frozen)}." if in_frozen else ". It is not in either plain-average recipe the search chose.")))
     best_form = forms.sort_values("Average block: predicts unseen games", ascending=False).iloc[0]
     lines.append(("What helped", "Average block, predicts unseen games, by form: " + "; ".join(f"{r.iloc[0]} {r.iloc[1]:+.2f}" for _, r in forms.iterrows())
                   + f". The strongest form is '{best_form.iloc[0]}'."))
