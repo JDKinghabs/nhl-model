@@ -1028,11 +1028,13 @@ def breakouts_page(standings, built_text):
             o, b = blind["results"][tier]["other"], blind["results"][tier]["beyond2"]
             rows.append([plain, f"{signed(o['result'])} (+/-{o['margin']:.2f})", signed(o["corsi"]), signed(o["xg"]), f"{signed(b['result'])} (+/-{b['margin']:.2f})",
                          "Yes" if blind["verdicts"][tier]["reaches_finish_line"] else "No", "Yes" if blind["verdicts"][tier]["separate_edge"] else "No"])
-        blind_html = (f"<p>Run on {esc(blind['run_on'])}, once, on seasons 2009-10 to 2013-14, which no earlier test had touched. "
+        blind_html = (f"<p>Run on {esc(blind['run_on'])}, once, on seasons 2009-10 to 2013-14, which no earlier test had touched. The two recipes were frozen and "
+                      "published in the project's code before it was run. "
                       "The finish line was set beforehand: predict unseen games at 0.46 or better; and, to count as a separate edge, still show something clear "
-                      "after shot share and shot quality are taken out.</p>"
-                      + static_table(["Recipe", "Predicts unseen games", "Corsi, same seasons", "Expected goals, same seasons",
-                                      "Left after shot share and shot quality", "Reached 0.46?", "Separate edge?"], rows))
+                      "after shot share and shot quality are taken out. The numbers in brackets are noise margins.</p>"
+                      + "<p class='note'>\"Corsi\" and \"xG share\" are how those two yardsticks predicted unseen games on the same five seasons. "
+                        "\"Left over\" is what remained after shot share and shot quality were taken out.</p>"
+                      + static_table(["Recipe", "Predicts unseen games", "Corsi", "xG share", "Left over", "Reached 0.46?", "Separate edge?"], rows))
     else:
         blind_html = (f"<p>Not run yet. The two recipes were frozen on {esc(frozen['frozen_on'])} and are public in the project's code. Five seasons (2009-10 to 2013-14) "
                       "have been kept out of every test. When their play-by-play has finished downloading, the recipes will be scored on them once, and that result "
@@ -1044,6 +1046,21 @@ def breakouts_page(standings, built_text):
     ber = blocks.loc["BER (breakout efficiency) [ours]"]
     battle_left = summary[(summary["Recipe"] == "Breakout battle") & summary["Question"].str.startswith("More than shot share and shot quality")].iloc[0]
     short = web_text(v[v.iloc[:, 0] == "Short answer"].iloc[0, 1]).replace("(ours minus the opponent's)", "(the team's numbers minus the opponent's)")
+    short = short.replace("a blind test on five kept-back seasons is the final word", "the blind test on five kept-back seasons is the final word")
+    close_call = "That is too close to call before the blind test."
+    if blind:
+        own_b, battle_b = blind["results"]["own"], blind["results"]["battle"]
+        reached = [name for tier, name in (("own", "own-breakouts"), ("battle", "breakout-battle")) if blind["verdicts"][tier]["reaches_finish_line"]]
+        edge = [name for tier, name in (("own", "own-breakouts"), ("battle", "breakout-battle")) if blind["verdicts"][tier]["separate_edge"]]
+        all_positive = all(r["other"]["seasons_above_zero"] == r["other"]["seasons"] for r in (own_b, battle_b))
+        blind_text = (f"On five seasons that no test had touched (2009-10 to 2013-14), the own-breakouts recipe predicted unseen games at {signed(own_b['other']['result'])} "
+                      f"and the breakout-battle recipe at {signed(battle_b['other']['result'])}, against {signed(own_b['other']['corsi'])} for Corsi on the same seasons. "
+                      + ("Both reached" if len(reached) == 2 else f"Only the {reached[0]} recipe reached" if reached else "Neither reached") + " the 0.46 line set beforehand. "
+                      f"After shot share and shot quality were taken out, what was left was {signed(own_b['beyond2']['result'])} and {signed(battle_b['beyond2']['result'])}: "
+                      + ("a separate edge for the " + " and ".join(edge) + " recipe. " if edge else "no separate edge. ")
+                      + ("Both links were positive in all five seasons, so the plain finding stands: teams that break out well do win more, "
+                         "but the breakout scores are not a better measure of a team than its shot share." if all_positive and not reached else ""))
+        close_call = "The blind test, on fresh seasons, " + ("found an edge." if edge else "found nothing clear either.")
     found = [("Short answer", short),
              ("The best single stats", f"The best single stat is {best[0].lower()}: it predicts games it has not seen at {signed(best[2][predicts])}. "
                                        f"BER, the best stat that is not built from shot counts, is at {signed(ber[predicts])}. "
@@ -1053,7 +1070,9 @@ def breakouts_page(standings, built_text):
                              f"did not help ({signed(forms.loc['ours, close games'].iloc[0])})."),
              ("Is it more than out-shooting the opponent?", f"Not clearly. After shot share and shot quality are taken out, the breakout-battle recipe leaves {signed(numbers['battle']['both'])}, "
                                                             f"about the size of its noise margin ({battle_left['Noise margin (+/-)']:.2f}), and the own-breakouts recipe leaves "
-                                                            f"{signed(numbers['own']['both'])}. That is too close to call before the blind test.")]
+                                                            f"{signed(numbers['own']['both'])}. {close_call}")]
+    if blind:
+        found.insert(1, ("The blind test", blind_text))
     if BREAKOUT_INDEX_FILE.exists():
         card = read_sheet(BREAKOUT_INDEX_FILE, "New stats", header=1).dropna(subset=["Contender score gain (AUC)"])
         if len(card):
@@ -1098,7 +1117,7 @@ The Corsi and expected-goals yardsticks and 5-on-5 ice time are from <a href="ht
 
 <h2>Team by team <span class="note">&middot; {esc(season)}, the last full season</span></h2>
 <p class="note">Sorted by BER. Click a heading to sort by another column, and hover over it for what it means. "Own" and "Battle" are the two recipes described below.
-This season's teams will be added when its play-by-play has been downloaded.</p>
+This season's teams are not in the table yet.</p>
 {team_table("breakout-table", latest, cols, conference_map(standings))}
 
 <h2>The stats, one by one</h2>
@@ -1135,7 +1154,7 @@ so each breakout attempt is judged by the first telling event in the 20 seconds 
   <li>A weak result can mean breakouts matter less than believed, or that events cannot see breakouts well enough. This page cannot tell those apart.</li>
   <li>A link is not proof of cause: good teams may break out well because they are good, not the other way round.</li>
   <li>These are season-level results about how strong a team is. They say nothing about who wins a single game.</li>
-  <li>With this many combinations tried, the numbers on this page are flattered a little by the search. The blind test above is the fair judge.</li>
+  <li>With this many combinations tried, the numbers from the ten search seasons are flattered a little by the search. The blind test above is the fair judge.</li>
 </ul>
 <p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL and MoneyPuck.com.</p>
 """
