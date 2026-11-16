@@ -32,7 +32,8 @@
   <li><strong><a href="red-flags.html">Red flags</a></strong><span class="tag live">Live</span><br><span class="note">A simple checklist of warning signs, and how often teams with those signs have missed the playoffs.</span></li>
   <li><strong><a href="slow-starters.html">Slow starters</a></strong><span class="tag live">Live</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
   <li><strong><a href="goaltending.html">Goaltending in context</a></strong><span class="tag live">Live</span><br><span class="note">Whether a goalie is bailing out a weak defense or a strong defense is being let down, and whether a hot playoff goalie can be foreseen.</span></li>
-  <li><strong>Zone time and breakouts</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone and how cleanly it gets out of its own end.</span></li>
+  <li><strong><a href="breakouts.html">Breakouts</a></strong><span class="tag live">Live</span><br><span class="note">Whether teams that get out of their own end cleanly win more, measured with a breakout efficiency rating (BER) and other stats read from the play-by-play.</span></li>
+  <li><strong>Zone time</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 
@@ -63,6 +64,13 @@
   <dt>R-squared</dt><dd>The share of the differences between teams that a forecast explains. 0.25 means a quarter.</dd>
   <dt>Lift</dt><dd>How much more often something happens to teams that meet a rule than to a random team.</dd>
   <dt>Hold-out test</dt><dd>A rule is built on all seasons but one and tried on the one it has never seen, then repeated for each season.</dd>
+  <dt>Blind test</dt><dd>A few seasons are kept out of all the testing. The final recipe is frozen, then scored on them once.</dd>
+  <dt>Breakout attempt</dt><dd>A team wins the puck in its own zone at 5-on-5: a faceoff win, a takeaway, a blocked shot, or the opponent missing the net.</dd>
+  <dt>Controlled exit</dt><dd>A breakout where the team is next seen beyond its blue line still holding the puck.</dd>
+  <dt>Safe clear</dt><dd>A breakout where the puck gets out but the opponent has it, and it does not come straight back.</dd>
+  <dt>BER</dt><dd>Breakout efficiency rating: 100 &times; (controlled exits + half the safe clears) &divide; breakout attempts. Read from play-by-play events, so it is an approximation.</dd>
+  <dt>Pinned-in spell</dt><dd>The opponent gets two or more shot attempts in a row, each within 30 seconds of the last, without play leaving the zone or stopping.</dd>
+  <dt>Battle</dt><dd>A team's number minus its opponents' number in the same games: for example the pinned-in spells it suffers against the ones it inflicts.</dd>
 </dl>
 
 <div class="prose">
@@ -79,7 +87,7 @@
   <div class="wrap">
     <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>
     <p>For information and entertainment only. Nothing here is betting or financial advice.</p>
-    <p>Page built Nov 14, 2026 at 4:18 PM ET.</p>
+    <p>Page built Nov 15, 2026 at 11:26 PM ET.</p>
   </div>
 </footer>
 <script src="site.js?v=241a8065"></script>

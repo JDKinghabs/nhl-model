@@ -227,7 +227,7 @@ def home_page(schedule, standings, built_text):
     body = f"""
 <h1>{esc(SITE_NAME)}</h1>
 <p class="lead">{esc(TAGLINE)}</p>
-<p class="note">Tonight's games and the standings. Also: <a href="contender-fit.html">Contender fit</a>, how each team's season so far compares with teams that went on to reach the conference finals, and the <a href="studies.html">Studies</a>: red flags, slow starters and goaltending in context. See <a href="about.html">About</a> for what the terms mean.</p>
+<p class="note">Tonight's games and the standings. Also: <a href="contender-fit.html">Contender fit</a>, how each team's season so far compares with teams that went on to reach the conference finals, and the <a href="studies.html">Studies</a>: red flags, slow starters, goaltending in context and breakouts. See <a href="about.html">About</a> for what the terms mean.</p>
 {games_section(schedule, standings)}
 {standings_section(standings)}
 """
@@ -251,7 +251,8 @@ def about_page(built_text):
   <li><strong><a href="red-flags.html">Red flags</a></strong><span class="tag live">Live</span><br><span class="note">A simple checklist of warning signs, and how often teams with those signs have missed the playoffs.</span></li>
   <li><strong><a href="slow-starters.html">Slow starters</a></strong><span class="tag live">Live</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
   <li><strong><a href="goaltending.html">Goaltending in context</a></strong><span class="tag live">Live</span><br><span class="note">Whether a goalie is bailing out a weak defense or a strong defense is being let down, and whether a hot playoff goalie can be foreseen.</span></li>
-  <li><strong>Zone time and breakouts</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone and how cleanly it gets out of its own end.</span></li>
+  <li><strong><a href="breakouts.html">Breakouts</a></strong><span class="tag live">Live</span><br><span class="note">Whether teams that get out of their own end cleanly win more, measured with a breakout efficiency rating (BER) and other stats read from the play-by-play.</span></li>
+  <li><strong>Zone time</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 
@@ -282,6 +283,13 @@ def about_page(built_text):
   <dt>R-squared</dt><dd>The share of the differences between teams that a forecast explains. 0.25 means a quarter.</dd>
   <dt>Lift</dt><dd>How much more often something happens to teams that meet a rule than to a random team.</dd>
   <dt>Hold-out test</dt><dd>A rule is built on all seasons but one and tried on the one it has never seen, then repeated for each season.</dd>
+  <dt>Blind test</dt><dd>A few seasons are kept out of all the testing. The final recipe is frozen, then scored on them once.</dd>
+  <dt>Breakout attempt</dt><dd>A team wins the puck in its own zone at 5-on-5: a faceoff win, a takeaway, a blocked shot, or the opponent missing the net.</dd>
+  <dt>Controlled exit</dt><dd>A breakout where the team is next seen beyond its blue line still holding the puck.</dd>
+  <dt>Safe clear</dt><dd>A breakout where the puck gets out but the opponent has it, and it does not come straight back.</dd>
+  <dt>BER</dt><dd>Breakout efficiency rating: 100 &times; (controlled exits + half the safe clears) &divide; breakout attempts. Read from play-by-play events, so it is an approximation.</dd>
+  <dt>Pinned-in spell</dt><dd>The opponent gets two or more shot attempts in a row, each within 30 seconds of the last, without play leaving the zone or stopping.</dd>
+  <dt>Battle</dt><dd>A team's number minus its opponents' number in the same games: for example the pinned-in spells it suffers against the ones it inflicts.</dd>
 </dl>
 
 <div class="prose">
@@ -946,6 +954,194 @@ Early in a season these labels are noisy.</p>
     return page("Goaltending in context - " + SITE_NAME, "studies", body, built_text, moneypuck=True)
 
 
+# ---- Breakouts -------------------------------------------------------------
+BREAKOUT_FILE = PROJECT_FOLDER / "outputs" / "breakout_round2.xlsx"
+BREAKOUT_INDEX_FILE = PROJECT_FOLDER / "outputs" / "breakout_index.xlsx"
+BREAKOUT_FROZEN = PROJECT_FOLDER / "reference" / "breakout_metric_frozen.json"
+BREAKOUT_STATS = [  # (name in the workbook, what it counts)
+    ("BER (breakout efficiency)", "Controlled exits, plus half credit for safe clears, as a share of the breakout attempts that could be judged."),
+    ("Pinned-in spells", "Times the opponent gets two or more shot attempts in a row without play leaving the zone. Fewer is better."),
+    ("Dangerous pinned-in spells", "Pinned-in spells that include a shot from the slot. Fewer is better."),
+    ("Defence-to-offence", "Own-zone puck wins that become the team's own shot attempt within 20 seconds."),
+    ("Zone-clear rate", "Own-zone puck wins after which play is next seen outside the zone within 20 seconds."),
+    ("Zone exit time", "Average seconds from an own-zone puck win until play is seen outside the zone. Shorter is better."),
+    ("Transition shot quality", "Share of quick-strike shots (within 5 seconds of play coming up the ice) taken from the slot."),
+    ("Own-zone turnovers", "Giveaways in the team's own zone plus pucks taken off it there. Fewer is better."),
+    ("Quick exits", "Share of own-zone puck wins that are out of the zone within 8 seconds."),
+    ("Costly giveaways", "Own-zone giveaways followed by a shot attempt against within 10 seconds. Fewer is better."),
+    ("Transition shots", "Shot attempts taken within 5 seconds of play coming up the ice."),
+    ("Icings", "How often a team ices the puck. Fewer is better."),
+]
+
+
+def signed(value):
+    return f"{float(value):+.2f}"
+
+
+def breakouts_page(standings, built_text):
+    import json
+    v = read_sheet(BREAKOUT_FILE, "Verdict")
+    summary = read_sheet(BREAKOUT_FILE, "Summary", header=1)
+    blocks = read_sheet(BREAKOUT_FILE, "Blocks", header=1).set_index("Block")
+    forms = read_sheet(BREAKOUT_FILE, "By form", header=1).set_index("Form")
+    yard = read_sheet(BREAKOUT_FILE, "Yardsticks")
+    teams = read_sheet(BREAKOUT_FILE, "Teams")
+    frozen = json.loads(BREAKOUT_FROZEN.read_text(encoding="utf-8"))
+    predicts, wins, repeats = "On its own: predicts unseen games", "On its own: goes with winning", "Repeats (odd vs even games)"
+    corsi = yard[yard["Stat"].str.startswith("Corsi")].iloc[0]
+
+    # --- the stats, one by one (each team's own number), best predictor first, with the two familiar yardsticks underneath ---
+    stat_rows = sorted(([name, what, blocks.loc[f"{name} [ours]"]] for name, what in BREAKOUT_STATS), key=lambda r: -r[2][predicts])
+    stat_table = static_table(
+        ["Stat", "What it counts", "Goes with winning", "Predicts unseen games", "Repeats"],
+        [[name.replace(" (breakout efficiency)", ""), what, signed(b[wins]), signed(b[predicts]), f"{b[repeats]:.2f}"] for name, what, b in stat_rows]
+        + [[f"Yardstick: {r['Stat']}", "", signed(r["Goes with winning"]), signed(r["Predicts unseen games"]), f"{r[repeats]:.2f}"] for _, r in yard.iterrows()],
+        left=(0, 1))
+
+    # --- the two frozen recipes ---
+    def honest(tier_label, question, kind):
+        row = summary[(summary["Recipe"] == tier_label) & summary["Question"].str.startswith(question)].iloc[0]
+        col = "Honest result (data-set weights)" if kind.startswith("data") else "Honest result (plain average of the chosen blocks)"
+        return float(row[col])
+
+    def in_words(metric):
+        names = [n.replace("[ours", "[the team's own").replace("[", "(").replace("]", ")") for n in metric["names"].values()]
+        if metric["kind"].startswith("data"):
+            return f"A weighted mix of all {len(names)} versions of the team's own stats. Heaviest weights: {'; '.join(names[:4])}."
+        return "The plain average of: " + "; ".join(names) + "."
+
+    recipe_rows, numbers = [], {}
+    for tier, label, plain in (("own", "Our own breakouts", "Own breakouts"), ("battle", "Breakout battle", "Breakout battle")):
+        m = frozen["metrics"][tier]
+        numbers[tier] = {q: honest(label, start, m["kind"]) for q, start in
+                         (("wins", "Goes with winning"), ("predicts", "PREDICTS"), ("corsi", "More than shot share (beyond Corsi)"), ("both", "More than shot share and shot quality"))}
+        n = numbers[tier]
+        recipe_rows.append([plain, in_words(m), signed(n["wins"]), signed(n["predicts"]), signed(n["corsi"]), signed(n["both"])])
+    recipe_table = static_table(["Recipe", "What is in it", "Goes with winning", "Predicts unseen games", "Left after shot share", "Left after shot share and shot quality"],
+                                recipe_rows, left=(0, 1))
+
+    # --- the blind test: pending, or its result ---
+    blind = frozen.get("blind_test")
+    if blind:
+        rows = []
+        for tier, plain in (("own", "Own breakouts"), ("battle", "Breakout battle")):
+            o, b = blind["results"][tier]["other"], blind["results"][tier]["beyond2"]
+            rows.append([plain, f"{signed(o['result'])} (+/-{o['margin']:.2f})", signed(o["corsi"]), signed(o["xg"]), f"{signed(b['result'])} (+/-{b['margin']:.2f})",
+                         "Yes" if blind["verdicts"][tier]["reaches_finish_line"] else "No", "Yes" if blind["verdicts"][tier]["separate_edge"] else "No"])
+        blind_html = (f"<p>Run on {esc(blind['run_on'])}, once, on seasons 2009-10 to 2013-14, which no earlier test had touched. "
+                      "The finish line was set beforehand: predict unseen games at 0.46 or better; and, to count as a separate edge, still show something clear "
+                      "after shot share and shot quality are taken out.</p>"
+                      + static_table(["Recipe", "Predicts unseen games", "Corsi, same seasons", "Expected goals, same seasons",
+                                      "Left after shot share and shot quality", "Reached 0.46?", "Separate edge?"], rows))
+    else:
+        blind_html = (f"<p>Not run yet. The two recipes were frozen on {esc(frozen['frozen_on'])} and are public in the project's code. Five seasons (2009-10 to 2013-14) "
+                      "have been kept out of every test. When their play-by-play has finished downloading, the recipes will be scored on them once, and that result "
+                      "will be reported here whatever it is. The finish line was set beforehand: predict unseen games at 0.46 or better (Corsi's level); and, to count "
+                      "as a separate edge, still show something clear after shot share and shot quality are taken out.</p>")
+
+    # --- what we found, in plain words ---
+    best = max(stat_rows, key=lambda r: r[2][predicts])
+    ber = blocks.loc["BER (breakout efficiency) [ours]"]
+    battle_left = summary[(summary["Recipe"] == "Breakout battle") & summary["Question"].str.startswith("More than shot share and shot quality")].iloc[0]
+    short = web_text(v[v.iloc[:, 0] == "Short answer"].iloc[0, 1]).replace("(ours minus the opponent's)", "(the team's numbers minus the opponent's)")
+    found = [("Short answer", short),
+             ("The best single stats", f"The best single stat is {best[0].lower()}: it predicts games it has not seen at {signed(best[2][predicts])}. "
+                                       f"BER, the best stat that is not built from shot counts, is at {signed(ber[predicts])}. "
+                                       f"Shot-attempt share (Corsi) is at {signed(corsi['Predicts unseen games'])}."),
+             ("What helped", f"Counting each stat as a battle, the team's number minus the opponent's in the same games, helped: the average stat predicts unseen games at "
+                             f"{signed(forms.loc['battle'].iloc[0])} as a battle against {signed(forms.loc['ours'].iloc[0])} on its own. Counting only moments when the score is close "
+                             f"did not help ({signed(forms.loc['ours, close games'].iloc[0])})."),
+             ("Is it more than out-shooting the opponent?", f"Not clearly. After shot share and shot quality are taken out, the breakout-battle recipe leaves {signed(numbers['battle']['both'])}, "
+                                                            f"about the size of its noise margin ({battle_left['Noise margin (+/-)']:.2f}), and the own-breakouts recipe leaves "
+                                                            f"{signed(numbers['own']['both'])}. That is too close to call before the blind test.")]
+    if BREAKOUT_INDEX_FILE.exists():
+        card = read_sheet(BREAKOUT_INDEX_FILE, "New stats", header=1).dropna(subset=["Contender score gain (AUC)"])
+        if len(card):
+            helped = int((card["Contender score gain (AUC)"] > card["Contender margin (+/-)"]).sum())
+            found.append(("Does it help pick contenders?", f"Not so far. Each of the first {len(card)} breakout stats was added to the contender score and tried on seasons the score "
+                                                           f"had not seen: {helped} of {len(card)} improved it by more than the noise. BER and the two recipes have not been put through that test yet."))
+    found_html = "<dl class='verdict'>" + "".join(f"<dt>{esc(k)}</dt><dd>{esc(t)}</dd>" for k, t in found) + "</dl>"
+
+    # --- team by team, the latest season in the workbook ---
+    season = teams["Season"].max()
+    latest = teams[teams["Season"] == season]
+    share = latest[["Controlled exits (share of judged attempts)", "Safe clears (share)", "Failed (share)"]].mean()
+    own_col, battle_col = "Our own breakouts score (0 = league average)", "Breakout battle score (0 = league average)"
+    cols = [
+        {"label": "Team", "get": lambda r: r["Team"], "kind": "text", "first": "ascending", "sub": lambda r: r["How the season ended"]},
+        {"label": "BER", "get": lambda r: r["BER"], "kind": "num", "fmt": lambda x: f"{x:.1f}",
+         "tip": "Breakout efficiency rating: 100 x (controlled exits + half the safe clears) / breakout attempts that could be judged"},
+        {"label": "Ctrl", "get": lambda r: r["Controlled exits (share of judged attempts)"], "kind": "num", "fmt": lambda x: f"{x:.0%}",
+         "tip": "Controlled exits, as a share of the breakout attempts that could be judged"},
+        {"label": "Clear", "get": lambda r: r["Safe clears (share)"], "kind": "num", "fmt": lambda x: f"{x:.0%}", "tip": "Safe clears, as a share of the breakout attempts that could be judged"},
+        {"label": "Fail", "get": lambda r: r["Failed (share)"], "kind": "num", "fmt": lambda x: f"{x:.0%}", "first": "ascending",
+         "tip": "Failed breakouts, as a share of the attempts that could be judged (lower is better)"},
+        {"label": "Pinned", "get": lambda r: r["Pinned-in spells per 60"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "first": "ascending",
+         "tip": "Pinned-in spells per 60 minutes of 5-on-5 (lower is better)"},
+        {"label": "Own", "get": lambda r: r[own_col], "kind": "num", "fmt": lambda x: f"{x:+.2f}",
+         "tip": "Own-breakouts recipe: steps above or below the league average (0 = average, +1 = a clearly good team)"},
+        {"label": "Battle", "get": lambda r: r[battle_col], "kind": "num", "fmt": lambda x: f"{x:+.2f}",
+         "tip": "Breakout-battle recipe: steps above or below the league average (0 = average, +1 = a clearly good team)"},
+        {"label": "P%", "get": lambda r: r["Points %"], "kind": "num", "fmt": fmt_pct, "tip": "Points percentage that season"},
+    ]
+
+    body = f"""
+<h1>Breakouts</h1>
+<p class="lead">Do teams that get out of their own end cleanly win more? And is that anything more than out-shooting the opponent?</p>
+<p class="note">Built from the NHL's play-by-play at 5-on-5: every faceoff, shot, hit, giveaway and takeaway, with where on the ice it happened.
+Ten regular seasons, 2014-15 to 2025-26 (2019-20 and 2020-21 are left out as unusual seasons). Every number in the tables is a correlation worked out on the teams' rankings
+within each season: 0 means no relationship, 1 a perfect one. Terms are explained on the <a href="about.html">About</a> page.
+The Corsi and expected-goals yardsticks and 5-on-5 ice time are from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used here for non-commercial purposes with credit.</p>
+
+<h2>What we found</h2>
+{found_html}
+
+<h2>Team by team <span class="note">&middot; {esc(season)}, the last full season</span></h2>
+<p class="note">Sorted by BER. Click a heading to sort by another column, and hover over it for what it means. "Own" and "Battle" are the two recipes described below.
+This season's teams will be added when its play-by-play has been downloaded.</p>
+{team_table("breakout-table", latest, cols, conference_map(standings))}
+
+<h2>The stats, one by one</h2>
+<p>Each row is a team's own number. "Goes with winning" compares it with points % and goal difference in the same season. "Predicts unseen games" builds the stat from
+half of a season's games and compares it with the results of the other half. "Repeats" compares the stat from one half of the games with the same stat from the other half:
+the higher it is, the more it is a real team trait and the less it is luck.</p>
+{stat_table}
+
+<h2>Two recipes</h2>
+<p>Every combination of up to four of these stats was tried (about 867,000 of them), each also counted in close-score moments only and as a battle against the opponent.
+To avoid keeping a lucky winner, the best combination was always chosen without the season it was scored on. "Own breakouts" uses only the team's own numbers;
+"breakout battle" also uses what the team does to its opponents, so it measures the forecheck as well as the breakout.</p>
+{recipe_table}
+
+<h2>The blind test</h2>
+{blind_html}
+
+<h2>How BER is read from the play-by-play</h2>
+<p>BER (breakout efficiency rating) is 100 &times; (controlled exits + half the safe clears) &divide; breakout attempts. The play-by-play does not record who has the puck,
+so each breakout attempt is judged by the first telling event in the 20 seconds after it:</p>
+<ul>
+  <li><strong>Breakout attempt:</strong> the team wins the puck in its own zone: a faceoff win, a takeaway, a blocked shot, or the opponent missing the net.</li>
+  <li><strong>Controlled exit:</strong> the next telling event is beyond the blue line and shows the team still had the puck: its own shot attempt, its own giveaway, a hit on one of its players, or the puck being taken off it there.</li>
+  <li><strong>Safe clear:</strong> the next telling event is beyond the blue line but the opponent has the puck, and it does not come straight back.</li>
+  <li><strong>Failed:</strong> a shot attempt against, a turnover in the zone, or an icing comes first.</li>
+  <li><strong>Cannot be judged:</strong> nothing telling happens in time. These attempts are left out. About 4 in 10 attempts end up here.</li>
+</ul>
+<p>In {esc(season)}, of the attempts that could be judged, {share.iloc[0]:.0%} were controlled exits, {share.iloc[1]:.0%} safe clears and {share.iloc[2]:.0%} failed.</p>
+
+<h2>How it was tested, and the limits</h2>
+<ul>
+  <li>These are event counts, not puck tracking. A clean exit often leaves no event behind, while a shot against is always recorded, so failures are over-counted.
+  The level of BER here cannot be compared with hand-tracked numbers; only the ranking of teams means something.</li>
+  <li>A weak result can mean breakouts matter less than believed, or that events cannot see breakouts well enough. This page cannot tell those apart.</li>
+  <li>A link is not proof of cause: good teams may break out well because they are good, not the other way round.</li>
+  <li>These are season-level results about how strong a team is. They say nothing about who wins a single game.</li>
+  <li>With this many combinations tried, the numbers on this page are flattered a little by the search. The blind test above is the fair judge.</li>
+</ul>
+<p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL and MoneyPuck.com.</p>
+"""
+    return page("Breakouts - " + SITE_NAME, "studies", body, built_text, moneypuck=True)
+
+
 # ---- The Studies hub -------------------------------------------------------
 def studies_page(available, built_text):
     """available: list of (title, href, question, headline_text, tag) for the pages that exist."""
@@ -955,14 +1151,14 @@ def studies_page(available, built_text):
         for title, href, question, headline in available)
     body = f"""
 <h1>Studies</h1>
-<p class="lead">Each study asks one hockey question of 15 seasons of NHL data (2009-10 on), tests the answer on seasons it has not seen,
+<p class="lead">Each study asks one hockey question of up to 15 seasons of NHL data (2009-10 on), tests the answer on seasons it has not seen,
 and says plainly when the evidence is thin.</p>
-<p class="note">Every page has a "Right now" list for the current season and a plain-English summary of what the history says.
+<p class="note">Every page has a team-by-team list and a plain-English summary of what the history says.
 The pages are estimates from past patterns, not predictions or betting advice.</p>
 <ul class="roadmap">{cards}</ul>
 <h2>Coming next</h2>
 <ul class="roadmap">
-  <li><strong>Zone time and breakouts</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone, and how cleanly it gets out of its own end.</span></li>
+  <li><strong>Zone time</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 """
@@ -1016,6 +1212,9 @@ def main():
         (GOAL_FILE, "goaltending.html", goaltending_page, "Goaltending in context",
          "Is a goalie bailing out a weak defense, or a strong defense being let down by its goalie? And can anything foresee a hot playoff goalie?", "What repeats",
          "python scripts/build_goaltending_study.py"),
+        (BREAKOUT_FILE, "breakouts.html", breakouts_page, "Breakouts",
+         "Do teams that get out of their own end cleanly win more, and is that anything more than out-shooting the opponent?", "Short answer",
+         "python scripts/build_breakout_round2.py"),
     ]
     for workbook, filename, builder, title, question, key, command in study_pages:
         if workbook.exists():

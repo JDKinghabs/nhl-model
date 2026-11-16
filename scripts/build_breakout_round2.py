@@ -592,6 +592,7 @@ def main():
                                 **{f"{name}: its score on the season left out": round(float(held[q][i]), 3) for q, name in QUESTIONS},
                                 "Data-weighted version, predicts unseen games": round(float(ridge_rows["other"].iloc[i]), 3)})
         frozen_metrics[tier] = {"label": label, "kind": "data-set weights (ridge)" if use_ridge else "plain average", "weights": weights,
+                                "names": {b: BLOCK_NAMES[BLOCKS.index(b)] for b in weights},
                                 "on_the_search_seasons": {"predicts_unseen_games_honest": round(plain, 3), "data_weighted_honest": round(weighted, 3),
                                                           "frozen_recipe_all_seasons": round(float(every["other"][best]), 3), "combinations_tried": int(len(allowed))}}
 
@@ -647,6 +648,30 @@ def main():
                          **{f"{name} (all search seasons)": round(float(every[q][i]), 3) for q, name in QUESTIONS}})
     tops = pd.DataFrame(tops)
 
+    # ---- team by team (the search seasons only): BER and its parts, a few other stats, and the two frozen scores ----
+    rows_o = with_opponent(rows)
+    g = rows_o.groupby(["season_id", "team_id"]).sum(numeric_only=True)
+    own_stats = raw_stats(g, "", "")
+    judged = g["ber_ctrl"] + g["ber_safe"] + g["ber_fail"]
+    z_blocks = block_table(rows_o).set_index(["season_id", "team_id"])
+    teams = pd.DataFrame({"BER": own_stats["ber"], "Controlled exits (share of judged attempts)": g["ber_ctrl"] / judged,
+                          "Safe clears (share)": g["ber_safe"] / judged, "Failed (share)": g["ber_fail"] / judged,
+                          "Pinned-in spells per 60": own_stats["pinned_pg"], "Zone-clear rate": own_stats["exit_success"],
+                          "Defence-to-offence rate": own_stats["d2o_rate"], "Own-zone turnovers per 60": own_stats["turnover_pg"]})
+    for tier, label in TIERS:
+        w = np.array([tiers[tier]["weights"].get(b, 0.0) for b in BLOCKS])
+        raw = pd.Series(z_blocks[BLOCKS].to_numpy() @ w, index=z_blocks.index)
+        by_season = raw.groupby(level="season_id")
+        teams[f"{label} score (0 = league average)"] = (raw - by_season.transform("mean")) / by_season.transform("std")
+    teams = teams.reset_index().merge(bi.comparison_numbers(nhl, seasons)[["season_id", "team_id", "team", "pts_pct", "outcome"]], on=["season_id", "team_id"], how="left")
+    teams = teams.sort_values(["season_id", "BER"], ascending=[False, False])
+    teams_out = pd.DataFrame({"Season": teams["season_id"].map(bi.season_label), "Team": teams["team"], "BER": teams["BER"].round(1),
+                              **{c: teams[c].round(3) for c in ["Controlled exits (share of judged attempts)", "Safe clears (share)", "Failed (share)"]},
+                              "Pinned-in spells per 60": teams["Pinned-in spells per 60"].round(2), "Zone-clear rate": teams["Zone-clear rate"].round(3),
+                              "Defence-to-offence rate": teams["Defence-to-offence rate"].round(3), "Own-zone turnovers per 60": teams["Own-zone turnovers per 60"].round(2),
+                              **{f"{label} score (0 = league average)": teams[f"{label} score (0 = league average)"].round(2) for _, label in TIERS},
+                              "Points %": teams["pts_pct"].round(3), "How the season ended": teams["outcome"]}).reset_index(drop=True)
+
     lines = [("What was done", f"{len(BLOCKS)} building blocks ({len(STATS)} stats, each as ours / ours in close games / battle / battle in close games), every combination of up to {args.max_size}: "
                                f"{total:,} breakout scores on {len(seasons)} seasons ({', '.join(labels)}). Yardsticks for predicting unseen games: Corsi {corsi:+.2f}, expected-goals share {xg:+.2f}.")]
     for tier, label in TIERS:
@@ -674,9 +699,26 @@ def main():
                   f"and 'breakout battle' is {'at or above' if battle_ok else 'below'} it. These seasons chose the recipes, so this is not the verdict: "
                   "the verdict is the blind test on 2009-10 to 2013-14, run once when they have all downloaded."))
     lines.append(("The freeze", f"Both recipes are saved in reference/{FROZEN_FILE.name}. Next step:  python scripts/build_breakout_round2.py --blind-test"))
+    own_t, battle_t = tiers["own"], tiers["battle"]
+    own_score = float(own_t["ridge"]["other"].mean()) if own_t["use_ridge"] else float(own_t["held"]["other"].mean())
+    left = battle_t["held"]["beyond2"]
+    lines.insert(0, ("Short answer",
+                     "Teams that get out of their own end well do win more, but breaking out is hard to tell apart from simply out-shooting the opponent. "
+                     f"The best score built only from a team's own breakouts predicts games it has not seen at {own_score:+.2f}; the best 'breakout battle' score "
+                     f"(the team's numbers minus the opponent's) reaches {battle_t['held']['other'].mean():+.2f}, level with shot-attempt share (Corsi, {corsi:+.2f}). "
+                     f"After shot share and shot quality are taken out, what is left is {left.mean():+.2f} with a noise margin of {2 * left.std(ddof=1) / np.sqrt(len(left)):.2f}. "
+                     "These numbers come from the seasons used to search; a blind test on five kept-back seasons is the final word."))
     verdict = pd.DataFrame(lines, columns=["", "Answer"])
 
-    sheets = {"Verdict": verdict, "Summary": summary, "By form": forms, "Chosen by season": pd.DataFrame(chosen_rows), "Blocks": blocks, "Top combinations": tops}
+    bench = bi.benchmark_halves(nhl, seasons)                             # the familiar stats, for the same three numbers
+    yardsticks = pd.DataFrame([
+        {"Stat": name, "Goes with winning": round(float(np.mean([p[key] for p in full_parts])), 3),
+         "Predicts unseen games": round(float(np.mean([np.mean([p[key] for p in parts]) for parts in half_parts])), 3),
+         "Repeats (odd vs even games)": round(float(bs.ps.season_spearman(bench, f"{col}_a", f"{col}_b").mean()), 2)}
+        for name, key, col in (("Corsi (shot-attempt share, 5-on-5)", "corsi", "corsi"), ("Expected-goals share (5-on-5)", "xg", "xg_share"))])
+
+    sheets = {"Verdict": verdict, "Summary": summary, "By form": forms, "Chosen by season": pd.DataFrame(chosen_rows), "Blocks": blocks, "Top combinations": tops,
+              "Teams": teams_out, "Yardsticks": yardsticks}
     notes = {"Summary": "'Honest' = the recipe was chosen without the season it was scored on. Still from the search seasons: the blind test is the judge.",
              "By form": "The average single block in each form. Shows whether close-game and battle versions help, before any combining.",
              "Chosen by season": "Which combination won on the OTHER seasons (by 'predicts unseen games') and how it did on the season left out, on every question.",
