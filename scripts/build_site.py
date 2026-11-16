@@ -957,6 +957,7 @@ Early in a season these labels are noisy.</p>
 # ---- Breakouts -------------------------------------------------------------
 BREAKOUT_FILE = PROJECT_FOLDER / "outputs" / "breakout_round2.xlsx"
 BREAKOUT_INDEX_FILE = PROJECT_FOLDER / "outputs" / "breakout_index.xlsx"
+BREAKOUT_NOW_FILE = PROJECT_FOLDER / "outputs" / "breakout_now.xlsx"
 BREAKOUT_FROZEN = PROJECT_FOLDER / "reference" / "breakout_metric_frozen.json"
 BREAKOUT_STATS = [  # (name in the workbook, what it counts)
     ("BER (breakout efficiency)", "Controlled exits, plus half credit for safe clears, as a share of the breakout attempts that could be judged."),
@@ -1104,6 +1105,19 @@ def breakouts_page(standings, built_text):
         {"label": "P%", "get": lambda r: r["Points %"], "kind": "num", "fmt": fmt_pct, "tip": "Points percentage that season"},
     ]
 
+    # --- this season so far (written by build_breakout_now.py), if it has been built ---
+    now_html = ""
+    if BREAKOUT_NOW_FILE.exists():
+        now = read_sheet(BREAKOUT_NOW_FILE, "Right now", header=1)
+        now_cols = [{**cols[0], "sub": lambda r: f"{int(r['Games'])} games"}] + cols[1:]
+        now_html = f"""
+<h2>This season <span class="note">&middot; games through {esc(through_text(read_note(BREAKOUT_NOW_FILE)))}</span></h2>
+<p class="note">Sorted by BER. Teams have played {int(now['Games'].min())} to {int(now['Games'].max())} games, so these numbers are still noisy: a first impression, not a verdict.
+"Own" and "Battle" are the two recipes described below, each compared with the other teams this season (0 = league average).
+Click a heading to sort by another column, and hover over it for what it means.</p>
+{team_table("breakout-now", now, now_cols, conference_map(standings))}
+"""
+
     body = f"""
 <h1>Breakouts</h1>
 <p class="lead">Do teams that get out of their own end cleanly win more? And is that anything more than out-shooting the opponent?</p>
@@ -1115,9 +1129,9 @@ The Corsi and expected-goals yardsticks and 5-on-5 ice time are from <a href="ht
 <h2>What we found</h2>
 {found_html}
 
-<h2>Team by team <span class="note">&middot; {esc(season)}, the last full season</span></h2>
-<p class="note">Sorted by BER. Click a heading to sort by another column, and hover over it for what it means. "Own" and "Battle" are the two recipes described below.
-This season's teams are not in the table yet.</p>
+{now_html}
+<h2>{'Last season' if now_html else 'Team by team'} <span class="note">&middot; {esc(season)}{'' if now_html else ', the last full season'}</span></h2>
+<p class="note">Sorted by BER. Click a heading to sort by another column, and hover over it for what it means. "Own" and "Battle" are the two recipes described below.{'' if now_html else " This season's teams are not in the table yet."}</p>
 {team_table("breakout-table", latest, cols, conference_map(standings))}
 
 <h2>The stats, one by one</h2>

@@ -402,21 +402,25 @@ def team_game_stats(ev):
     return out.rename(columns={"T": "team_id"})
 
 
-def load_game_rows(pbp, nhl, only=None, lockbox=False):
+def load_game_rows(pbp, nhl, only=None, lockbox=False, in_progress=False):
     """
     Reads every fully downloaded season and returns (one row per team per game, the seasons used, the flagged odd seasons),
     or None if no season is ready. `only` is an optional comma-separated list of season ids.
     The five LOCKBOX seasons are left alone unless lockbox=True, which reads ONLY those (the blind test).
+    in_progress=True reads ONLY the season being played now, with whatever games have been downloaded (build_breakout_now.py).
     The per-game counts of each season are saved in data/breakout/ so later runs do not have to rebuild them.
     """
     coverage = season_coverage(pbp, nhl)
     flags = pd.read_csv(PROJECT_FOLDER / "reference" / "season_flags.csv")
     odd_seasons = set(int(s) for s in flags.loc[flags["include_main"] == "N", "season_id"])
+    saved_games = {int(r.season_id): int(r.saved) for r in coverage.itertuples()}
     current = int(coverage["season_id"].max())
     ready = [int(s) for s in coverage.loc[coverage["coverage"] >= MIN_COVERAGE, "season_id"] if int(s) != current]
     usable = [s for s in ready if (s in LOCKBOX) == lockbox]
     if only:
         usable = [s for s in usable if s in {int(x) for x in only.split(",")}]
+    if in_progress:
+        usable = [current] if saved_games.get(current, 0) > 0 else []
     print("Season coverage of the play-by-play download:")
     for r in coverage.itertuples():
         if r.season_id in usable:
@@ -424,17 +428,17 @@ def load_game_rows(pbp, nhl, only=None, lockbox=False):
         elif r.season_id == current:
             mark = "in progress"
         elif r.season_id in LOCKBOX and not lockbox:
-            mark = "kept back for the blind test"
+            mark = "blind-test season (never used to search)"
         else:
             mark = ""
         print(f"  {season_label(r.season_id)}: {int(r.saved):,} of {int(r.played):,} games ({r.coverage:.0%})  {mark}")
     if not usable:
-        print("No season is fully downloaded yet. Try again later.")
+        print("No play-by-play for this season has been downloaded yet. Run:  python scripts/pull_play_by_play.py" if in_progress
+              else "No season is fully downloaded yet. Try again later.")
         return None
 
     folder = PROJECT_FOLDER / "data" / "breakout"
     folder.mkdir(parents=True, exist_ok=True)
-    saved_games = {int(r.season_id): int(r.saved) for r in coverage.itertuples()}
     pieces, blocked_checks = [], []
     for season in usable:
         stamp = f"v{FEATURES_VERSION}_{EXIT_CAP}_{FAST_EXIT}_{GIVEAWAY_WINDOW}_{TRANSITION_WINDOW}_{PINNED_GAP}_{D2O_WINDOW}_{saved_games[season]}"
@@ -451,7 +455,8 @@ def load_game_rows(pbp, nhl, only=None, lockbox=False):
         blocked_checks.append(check)
     game_rows = add_ice_time(pd.concat(pieces, ignore_index=True), nhl)
     missing_toi = int(game_rows["toi5"].isna().sum())
-    game_rows["toi5"] = game_rows["toi5"].fillna(game_rows["toi5"].median())
+    # a game MoneyPuck does not have yet (the newest games of this season) uses the 5-on-5 time counted from the events instead
+    game_rows["toi5"] = game_rows["toi5"].fillna(game_rows["ev5"].where(game_rows["ev5"] > 0)).fillna(game_rows["toi5"].median())
     # 5-on-5 ice time in close-score moments: MoneyPuck's 5-on-5 time, split by the share of the events' clock that was close
     game_rows["toi5_c"] = game_rows["toi5"] * (game_rows["ev5_c"] / game_rows["ev5"]).fillna(0)
     clock_match = float(np.corrcoef(game_rows["ev5"], game_rows["toi5"])[0, 1])

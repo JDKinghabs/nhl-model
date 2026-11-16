@@ -37,6 +37,22 @@ listed in the sections below (`build_contender_fit.py`, `build_red_flags.py`, `b
 `build_goaltending_study.py`) and then `python scripts/build_site.py`. A page whose workbook is missing is skipped and
 its existing page in `docs/` is left as it is.
 
+The **Breakouts** page has a "This season" table. To bring it up to date, download the play-by-play of the new games
+(about a second a game) and rebuild the table. Nothing is searched or re-fitted: the two frozen recipes are applied as
+they are.
+
+```
+python scripts/pull_game_results.py
+python scripts/build_database.py
+python scripts/load_moneypuck.py
+python scripts/pull_play_by_play.py
+python scripts/build_breakout_now.py
+python scripts/build_site.py
+```
+
+`build_breakout_now.py` writes `outputs/breakout_now.xlsx`. A game that the MoneyPuck game file does not have yet uses
+5-on-5 time counted from the events instead, so the table does not wait for a new MoneyPuck download.
+
 Then commit and push the changed files in `docs/`. The pages show summary results only, never the raw data files.
 
 ## Rebuilding the data
