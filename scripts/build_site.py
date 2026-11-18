@@ -212,7 +212,7 @@ def standings_section(standings):
   <button type="button" data-filter="Western" aria-pressed="false">Western</button>
 </div>
 <div class="table-wrap">
-<table class="sortable" id="standings">
+<table class="sortable ranked" id="standings">
 <caption class="note" style="text-align:left;padding:0 0 8px;caption-side:bottom">Click a column heading to sort. Hover a heading for what it means.</caption>
 <thead><tr>{''.join(head)}</tr></thead>
 <tbody>
@@ -384,7 +384,7 @@ the model disagrees with the standings.</p>
   <button type="button" data-filter="Western" aria-pressed="false">Western</button>
 </div>
 <div class="table-wrap">
-<table class="sortable" id="fit-table">
+<table class="sortable ranked" id="fit-table">
 <thead><tr>{th}</tr></thead>
 <tbody>
 {chr(10).join(rows)}
@@ -639,21 +639,22 @@ def static_table(headers, rows, left=(0,)):
     return f'<div class="table-wrap"><table><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
-def team_table(table_id, df, cols, conference, sort_note=True):
+def team_table(table_id, df, cols, conference, sort_note=True, rank_tip="Rank: position in the list as first shown"):
     """
-    A sortable team table with the League / Eastern / Western buttons.
+    A sortable team table with the League / Eastern / Western buttons, and a "#" rank column on the left
+    (each team's position in the list as it is first shown; rank_tip says what that order is).
     cols: list of dicts with  label, get (a function of a row), kind ('num' or 'text'), fmt (function), tip,
           first ('ascending' or None), sub (optional function giving a small second line, for the team column).
     """
-    head = []
+    head = [f'<th data-sort="num" data-first="ascending" title="{esc(rank_tip)}" scope="col"><button type="button">#</button></th>']
     for c in cols:
         left = " left" if c.get("sub") else ""
         first = f' data-first="{c["first"]}"' if c.get("first") else ""
         head.append(f'<th class="{left.strip()}" data-sort="{c["kind"]}"{first} title="{esc(c.get("tip", c["label"]))}" scope="col">'
                     f'<button type="button">{esc(c["label"])}</button></th>')
     rows = []
-    for _, r in df.iterrows():
-        cells = []
+    for position, (_, r) in enumerate(df.iterrows(), 1):
+        cells = [f'<td class="rank" data-v="{position}">{position}</td>']
         for c in cols:
             raw = c["get"](r)
             shown = c["fmt"](raw) if c.get("fmt") else str(raw)
@@ -676,7 +677,7 @@ def team_table(table_id, df, cols, conference, sort_note=True):
   <button type="button" data-filter="Western" aria-pressed="false">Western</button>
 </div>
 <div class="table-wrap">
-<table class="sortable" id="{table_id}">
+<table class="sortable ranked" id="{table_id}">
 <thead><tr>{''.join(head)}</tr></thead>
 <tbody>
 {chr(10).join(rows)}
@@ -739,7 +740,7 @@ def red_flags_page(standings, built_text):
 <h1>Red flags</h1>
 <h2>Right now <span class="note">&middot; teams in a playoff spot, games through {esc(through_text(note))}</span></h2>
 <p class="note">Sorted by number of flags, then by how thin the cushion is. Early in a season (about 20 games) flags are noisy.</p>
-{team_table("flags-table", right, cols, conference_map(standings))}
+{team_table("flags-table", right, cols, conference_map(standings), rank_tip="Rank on this list: most flags first, then the thinnest cushion")}
 
 <h2>What we found</h2>
 {verdict_list(v)}
@@ -841,7 +842,7 @@ A slow start is a reason to check how far behind a team is and what pace it need
 <h1>Slow starters</h1>
 <h2>Right now <span class="note">&middot; teams out of a playoff spot, games through {esc(through_text(note))}</span></h2>
 <p class="note">"Needs" is the points % the team must earn in its remaining games to reach the typical final cut line. Early in a season the signs are noisy.</p>
-{team_table("slow-table", right, cols, conference_map(standings))}
+{team_table("slow-table", right, cols, conference_map(standings), rank_tip="Rank on this list: closest to a playoff spot first")}
 
 <h2>What we found</h2>
 {verdict_list(v)}
@@ -926,7 +927,7 @@ Terms are explained on the <a href="about.html">About</a> page. {MONEYPUCK_NOTE}
 <h2>Right now <span class="note">&middot; games through {esc(through_text(note))}</span></h2>
 <p class="note">Teams are labeled "both good", "goalie bailing out the defense", "defense let down by the goalie" or "both weak" by whether each part is above or below the league median.
 Early in a season these labels are noisy.</p>
-{team_table("goalie-table", right, cols, conference_map(standings))}
+{team_table("goalie-table", right, cols, conference_map(standings), rank_tip="Rank on this list: by goaltending (goals saved above expected per 60), best first")}
 
 <h2>What we found</h2>
 {verdict_list(v)}
@@ -1122,7 +1123,7 @@ def breakouts_page(standings, built_text):
 <p class="note">Sorted by BER. Teams have played {int(now['Games'].min())} to {int(now['Games'].max())} games, so these numbers are still noisy: a first impression, not a verdict.
 "Own" and "Battle" are the two recipes described below, each compared with the other teams this season (0 = league average).
 Click a heading to sort by another column, and hover over it for what it means.</p>
-{team_table("breakout-now", now, now_cols, conference_map(standings))}
+{team_table("breakout-now", now, now_cols, conference_map(standings), rank_tip="Rank by BER this season")}
 """
 
     # --- BEI, the breakout efficiency index (written by build_breakout_bei.py), this season and last ---
@@ -1154,12 +1155,12 @@ Click a heading to sort by another column, and hover over it for what it means.<
 <h2>This season: BEI <span class="note">&middot; games through {esc(through_text(read_note(BREAKOUT_BEI_FILE, "This season")))}</span></h2>
 <p class="note">Sorted by BEI, the breakout efficiency index (version 1): own-zone giveaways, time spent in the own zone and transition shots, each as a league
 percentile, weighted 45 / 30 / 25. 100 would be best in the league at all three. Early in a season these numbers are noisy.</p>
-{team_table("bei-now", bei_now, bei_cols(lambda r: f"{int(r['Games'])} games"), conference_map(standings))}
+{team_table("bei-now", bei_now, bei_cols(lambda r: f"{int(r['Games'])} games"), conference_map(standings), rank_tip="Rank by BEI this season")}
 """
         bei_last_html = f"""
 <h2>Last season: BEI <span class="note">&middot; {esc(bei_last_season)}</span></h2>
 <p class="note">Sorted by BEI. Click a heading to sort by another column, and hover over it for what it means.</p>
-{team_table("bei-last", bei_last, bei_cols(lambda r: r["How the season ended"]), conference_map(standings))}
+{team_table("bei-last", bei_last, bei_cols(lambda r: r["How the season ended"]), conference_map(standings), rank_tip="Rank by BEI last season")}
 """
         t = bei_test
         part = {name: t.loc[name] for name in t.index}
@@ -1201,7 +1202,7 @@ The Corsi and expected-goals yardsticks and 5-on-5 ice time are from <a href="ht
 {bei_now_html}
 <h2>{'Last season: BER' if now_html else 'Team by team'} <span class="note">&middot; {esc(season)}{'' if now_html else ', the last full season'}</span></h2>
 <p class="note">Sorted by BER. Click a heading to sort by another column, and hover over it for what it means. "Own" and "Battle" are the two recipes described below.{'' if now_html else " This season's teams are not in the table yet."}</p>
-{team_table("breakout-table", latest, cols, conference_map(standings))}
+{team_table("breakout-table", latest, cols, conference_map(standings), rank_tip="Rank by BER last season")}
 {bei_last_html}
 
 <h2>What we found (BER)</h2>
