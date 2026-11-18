@@ -251,7 +251,7 @@ def about_page(built_text):
   <li><strong><a href="slow-starters.html">Slow starters</a></strong><span class="tag live">Live</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
   <li><strong><a href="goaltending.html">Goaltending in context</a></strong><span class="tag live">Live</span><br><span class="note">Whether a goalie is bailing out a weak defense or a strong defense is being let down, and whether a hot playoff goalie can be foreseen.</span></li>
   <li><strong><a href="breakouts.html">Breakouts</a></strong><span class="tag live">Live</span><br><span class="note">Whether teams that get out of their own end cleanly win more, measured with a breakout efficiency rating (BER) and other stats read from the play-by-play.</span></li>
-  <li><strong>Zone time</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone.</span></li>
+  <li><strong><a href="zone-chances.html">Zone time and chances</a></strong><span class="tag live">Live</span><br><span class="note">How much time each team spends in the offensive zone, and how many scoring chances it creates from that time.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 
@@ -287,6 +287,9 @@ def about_page(built_text):
   <dt>Controlled exit</dt><dd>A breakout where the team is next seen beyond its blue line still holding the puck.</dd>
   <dt>Safe clear</dt><dd>A breakout where the puck gets out but the opponent has it, and it does not come straight back.</dd>
   <dt>BER</dt><dd>Breakout efficiency rating: 100 &times; (controlled exits + half the safe clears) &divide; breakout attempts. Read from play-by-play events, so it is an approximation.</dd>
+  <dt>Scoring chance</dt><dd>A shot on goal, missed shot or goal at 5-on-5 from the area in front of the net: from the goal posts out to the faceoff dots, then out to the top of the circles.</dd>
+  <dt>Chance share</dt><dd>A team's scoring chances divided by all scoring chances in its games.</dd>
+  <dt>Zone time</dt><dd>The share of 5-on-5 time spent in each zone, from the NHL's EDGE puck tracking (2021-22 on).</dd>
   <dt>BEI</dt><dd>Breakout efficiency index: own-zone giveaways per hour of own-zone time (45%), share of time in the own zone (30%) and transition shot attempts per 60 (25%), each as a league percentile. 0 to 100.</dd>
   <dt>Pinned-in spell</dt><dd>The opponent gets two or more shot attempts in a row, each within 30 seconds of the last, without play leaving the zone or stopping.</dd>
   <dt>Battle</dt><dd>A team's number minus its opponents' number in the same games: for example the pinned-in spells it suffers against the ones it inflicts.</dd>
@@ -1252,6 +1255,152 @@ so each breakout attempt is judged by the first telling event in the 20 seconds 
     return page("Breakouts - " + SITE_NAME, "studies", body, built_text, moneypuck=True)
 
 
+# ---- Zone time and chances -------------------------------------------------
+ZONE_FILE = PROJECT_FOLDER / "outputs" / "zone_chances.xlsx"
+
+# The offensive zone seen from above, with the scoring-chance ("home plate") area shaded. 4 pixels = 1 foot;
+# x runs from the blue line (25 feet from centre) to the end boards (100 feet), y across the ice (85 feet).
+HOME_PLATE_SVG = """
+<svg class="rink" viewBox="0 0 300 340" role="img" aria-label="The offensive zone from above. The scoring-chance area runs from the goal posts out to the faceoff dots, then out to the top of the faceoff circles.">
+  <rect x="1" y="1" width="298" height="338" rx="70" ry="70" fill="#ffffff" stroke="#0b1f3a" stroke-width="2"/>
+  <rect x="0" y="1" width="80" height="338" fill="#ffffff"/>
+  <line x1="1" y1="1" x2="230" y2="1" stroke="#0b1f3a" stroke-width="2"/>
+  <line x1="1" y1="339" x2="230" y2="339" stroke="#0b1f3a" stroke-width="2"/>
+  <line x1="2" y1="2" x2="2" y2="338" stroke="#0033a0" stroke-width="4"/>
+  <line x1="256" y1="12" x2="256" y2="328" stroke="#c8102e" stroke-width="1.5"/>
+  <polygon points="116,82 176,82 256,154 256,186 176,258 116,258" fill="rgba(0,51,160,.16)" stroke="#0033a0" stroke-width="2"/>
+  <circle cx="176" cy="82" r="60" fill="none" stroke="#c8102e" stroke-width="1.5"/>
+  <circle cx="176" cy="258" r="60" fill="none" stroke="#c8102e" stroke-width="1.5"/>
+  <circle cx="176" cy="82" r="4" fill="#c8102e"/>
+  <circle cx="176" cy="258" r="4" fill="#c8102e"/>
+  <path d="M256 158 h8 v24 h-8" fill="none" stroke="#0b1f3a" stroke-width="2"/>
+  <text x="190" y="166" text-anchor="middle" font-size="13" font-weight="700" fill="#0033a0">scoring-</text>
+  <text x="190" y="182" text-anchor="middle" font-size="13" font-weight="700" fill="#0033a0">chance area</text>
+  <text x="8" y="330" font-size="12" fill="#5b6b80">blue line</text>
+  <text x="236" y="330" font-size="12" fill="#5b6b80" text-anchor="end">goal line</text>
+</svg>"""
+
+
+def zone_chances_page(standings, built_text):
+    v = read_sheet(ZONE_FILE, "Verdict")
+    now = read_sheet(ZONE_FILE, "This season", header=1)
+    last = read_sheet(ZONE_FILE, "Last season", header=1)
+    unseen = read_sheet(ZONE_FILE, "Unseen games", header=1)
+    both = read_sheet(ZONE_FILE, "Time or what you do", header=1)
+    repeats = read_sheet(ZONE_FILE, "Repeats")
+    champs = read_sheet(ZONE_FILE, "Champions")
+    est = read_sheet(ZONE_FILE, "Estimate check", header=1)
+    last_label = str(read_note(ZONE_FILE, "Last season")).split(".")[0].replace("Season ", "")
+
+    def cols(sub):
+        return [
+            {"label": "Team", "get": lambda r: r["Team"], "kind": "text", "first": "ascending", "sub": sub},
+            {"label": "OZ min", "get": lambda r: r["Offensive-zone minutes per 60"], "kind": "num", "fmt": lambda x: f"{x:.1f}",
+             "tip": "Minutes in the offensive zone per 60 minutes of 5-on-5 play (NHL EDGE tracking)"},
+            {"label": "Per 10 OZ", "get": lambda r: r["Chances per 10 offensive-zone minutes"], "kind": "num", "fmt": lambda x: f"{x:.1f}",
+             "tip": "Scoring chances created per 10 minutes spent in the offensive zone: what the team does with its time there"},
+            {"label": "CF/60", "get": lambda r: r["Chances for per 60"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "tip": "Scoring chances for per 60 minutes at 5-on-5"},
+            {"label": "DZ min", "get": lambda r: r["Own-zone minutes per 60"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "first": "ascending",
+             "tip": "Minutes in its own zone per 60 minutes of 5-on-5 play (lower is better)"},
+            {"label": "Per 10 DZ", "get": lambda r: r["Chances against per 10 own-zone minutes"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "first": "ascending",
+             "tip": "Scoring chances allowed per 10 minutes spent in its own zone (lower is better)"},
+            {"label": "CA/60", "get": lambda r: r["Chances against per 60"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "first": "ascending",
+             "tip": "Scoring chances against per 60 minutes at 5-on-5 (lower is better)"},
+            {"label": "Share", "get": lambda r: r["Chance share"], "kind": "num", "fmt": lambda x: f"{x:.1%}", "tip": "Chance share: chances for / (chances for + against)"},
+            {"label": "P%", "get": lambda r: r["Points %"], "kind": "num", "fmt": fmt_pct, "tip": "Points percentage"},
+        ]
+
+    def pm(value, margin):
+        return f"{float(value):+.2f} (+/-{float(margin):.2f})" if pd.notna(value) else "-"
+
+    unseen_rows = [[r["Statistic"], pm(r["Predicts unseen games"], r["Predicts unseen games: noise margin"]),
+                    pm(r["Beyond shot share (Corsi)"], r["Beyond shot share (Corsi): noise margin"]),
+                    pm(r["Beyond shot share and expected goals"], r["Beyond shot share and expected goals: noise margin"]),
+                    signed(r["Goes with winning, same season (points %)"])] for _, r in unseen.iterrows()]
+    unseen_table = static_table(["Statistic", "Predicts unseen games", "Beyond shot share", "Beyond shot share and expected goals", "Same season (flattered)"], unseen_rows)
+    both_rows = [[r["Statistic"], pm(r["Predicts unseen games, with the other part taken out"], r["Noise margin"])] for _, r in both.iterrows()]
+    both_table = static_table(["Part", "Predicts unseen games, with the other part taken out"], both_rows)
+    repeat_rows = [[r["Statistic"], f"{r['Repeats (odd vs even games)']:.2f}", f"{r['Estimate for a full season']:.2f}"] for _, r in repeats.iterrows()]
+    repeat_table = static_table(["Statistic", "Half a season vs the other half", "Estimate for a full season"], repeat_rows)
+    pct_cols = [c for c in champs.columns if c.endswith("(percentile)")]
+    champ_rows = [[r["How the season ended"], str(int(r["Team-seasons"]))] + [f"{r[c]:.0f}" for c in pct_cols] for _, r in champs.iterrows()]
+    champ_table = static_table(["How the season ended", "Team-seasons"] + [c.replace(" (percentile)", "") for c in pct_cols], champ_rows)
+    chosen = est.loc[est["Choosing seasons: average"].idxmax()]
+    overlap = both.set_index("Statistic").loc["Offensive-zone time", "How much the two parts move together"]
+
+    about_html = about_this_page(
+        "How much time does a team spend in the offensive zone, how many scoring chances does it create from that time, and which of those goes with winning?",
+        f"""All numbers are at 5-on-5 in the regular season. Scoring chances come from the NHL's play-by-play shot coordinates. In the team tables, zone time is the NHL's own
+EDGE puck tracking (2021-22 on). The tests cover the finished seasons from 2009-10 to 2025-26 (without the shortened 2019-20 and 2020-21), and use an estimate of zone time
+from the play-by-play because they need game-by-game numbers. Terms are explained on the <a href="about.html">About</a> page. 5-on-5 ice time, Corsi and expected goals are from
+<a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used here for non-commercial purposes with credit.""")
+
+    body = f"""
+<h1>Zone time and chances</h1>
+<h2>This season <span class="note">&middot; games through {esc(through_text(read_note(ZONE_FILE, "This season")))}</span></h2>
+<p class="note">Sorted by chance share. "OZ min" is minutes in the offensive zone per 60 minutes at 5-on-5, and "Per 10 OZ" is how many scoring chances the team creates
+for every 10 of those minutes; "DZ min" and "Per 10 DZ" are the same in its own zone. Teams have played {int(now['Games'].min())} to {int(now['Games'].max())} games,
+so these numbers are still noisy. Hover over a heading for what it means.</p>
+{team_table("zone-now", now, cols(lambda r: f"{int(r['Games'])} games"), conference_map(standings), rank_tip="Rank by chance share this season")}
+
+<h2>Last season <span class="note">&middot; {esc(last_label)}</span></h2>
+<p class="note">Sorted by chance share. Click a heading to sort by another column.</p>
+{team_table("zone-last", last, cols(lambda r: r["How the season ended"]), conference_map(standings), rank_tip="Rank by chance share last season")}
+
+<h2>What we found</h2>
+{verdict_list(v, skip=("What was done",))}
+
+<h2>Time in the zone, or what you do with it?</h2>
+<p>A team's chances per 60 minutes are its share of time in the offensive zone times the chances it creates per minute there. The two parts move together only a little
+({signed(overlap)}), so a team can get its chances either way. Each part is tested here with the other taken out.</p>
+{both_table}
+
+<h2>Which numbers predict games they have not seen?</h2>
+<p>Each number is built from the odd-numbered games of a season and compared with the results (points % and goal difference) of the even-numbered games, and the other way
+round. That is the fair test: in the same games, chances and goals overlap because goals are chances too. "Beyond shot share" is what is left after taking out what
+shot-attempt share (Corsi) already explains. Numbers in brackets are noise margins; for numbers where lower is better (chances against, own-zone time) the sign is turned
+so that positive always means "goes with good results".</p>
+{unseen_table}
+
+<h2>Do the numbers repeat?</h2>
+<p>The same number from one half of a season's games against the other half. The closer to 1, the more it is a real team trait rather than luck.</p>
+{repeat_table}
+
+<h2>Champions</h2>
+<p>Where each group of teams ranked in the league at the end of the regular season (percentile: 100 = best, 50 = average; for numbers where lower is better, 100 still means best).</p>
+{champ_table}
+
+<h2>How it is measured</h2>
+<div class="measure">
+{HOME_PLATE_SVG}
+<div>
+<ul>
+  <li><strong>Scoring chance:</strong> a shot on goal, a missed shot or a goal at 5-on-5 from the shaded area: from the goal posts out to the faceoff dots, then
+  straight out to the top of the circles. Blocked shots are left out because the NHL records where the block happened, not where the shot was taken.</li>
+  <li><strong>Zone time:</strong> the share of 5-on-5 time spent in the offensive, neutral and own zone. In the team tables it is the NHL's EDGE puck tracking.</li>
+  <li><strong>Chances per 10 minutes in the zone:</strong> chances created divided by minutes spent in the offensive zone, times 10. The same against, in the own zone.</li>
+  <li><strong>Chance share:</strong> the team's chances divided by all chances in its games.</li>
+</ul>
+<p>The tests need zone time game by game and back to 2009-10, which the NHL's tracking does not give. So they use an estimate from the play-by-play: the time between two
+events is credited to the zone the play was in. Four versions were compared with the NHL's tracking on 2021-22 to 2023-24; the best ("{esc(chosen['How the time between two events is split'])}",
+gaps up to {int(chosen['Longest gap counted (seconds)'])} seconds) agreed at {signed(chosen['Choosing seasons: average'])}, and at {signed(chosen['Confirming seasons: average'])}
+on 2024-25 and 2025-26, which it had not been chosen on.</p>
+</div>
+</div>
+{about_html}
+<h2>How it was tested, and the limits</h2>
+<ul>
+  <li>The chance area is a fixed choice made before the tests, not tuned to the results. It uses shot location only: rebounds, rush chances and passes before the shot
+  are not counted separately.</li>
+  <li>The same-season numbers are flattered, because goals are chances too. The unseen-games test is the fair one.</li>
+  <li>Zone time in the tests is an estimate. It tracks the NHL's own numbers well but not perfectly, which makes the zone-time results a little weaker than they really are.</li>
+  <li>A link is not proof of cause, and these are season-level results: they say how strong a team is, not who wins a single game.</li>
+</ul>
+<p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL, NHL EDGE and MoneyPuck.com.</p>
+"""
+    return page("Zone time and chances - " + SITE_NAME, "studies", body, built_text, moneypuck=True)
+
+
 # ---- The Studies hub -------------------------------------------------------
 def studies_page(available, built_text):
     """available: list of (title, href, question, headline_text, tag) for the pages that exist."""
@@ -1264,7 +1413,6 @@ def studies_page(available, built_text):
 <ul class="roadmap">{cards}</ul>
 <h2>Coming next</h2>
 <ul class="roadmap">
-  <li><strong>Zone time</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 <h2>About these studies</h2>
@@ -1325,6 +1473,9 @@ def main():
         (BREAKOUT_FILE, "breakouts.html", breakouts_page, "Breakouts",
          "Do teams that get out of their own end cleanly win more, and is that anything more than out-shooting the opponent? Two measures: BER and BEI.", "Short answer",
          "python scripts/build_breakout_round2.py"),
+        (ZONE_FILE, "zone-chances.html", zone_chances_page, "Zone time and chances",
+         "How much time does a team spend in the offensive zone, how many scoring chances does it create from it, and which goes with winning?", "Short answer",
+         "python scripts/build_zone_chances.py"),
     ]
     for workbook, filename, builder, title, question, key, command in study_pages:
         if workbook.exists():

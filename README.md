@@ -59,7 +59,7 @@ Then commit and push the changed files in `docs/`. The pages show summary result
 
 Every morning at 6:00 AM, Windows Task Scheduler runs `scripts/daily_update.py` on this computer. It refreshes
 tonight's games and the standings, this season's game results, the contender fit and the Breakouts tables for
-this season (BER and BEI), rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
+this season (BER and BEI), the Zone time and chances tables, rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
 minutes and needs nothing from you.
 
 - **Safety rules.** If any step fails it stops and publishes nothing. It does not run at all if the project has unsaved
@@ -214,6 +214,18 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     python scripts/build_breakout_bei.py
     ```
     The workbook is `outputs/breakout_bei.xlsx`. Both tables are on the Breakouts page.
+
+15. Zone time and scoring chances: splits each team's 5-on-5 scoring chances into time spent in the offensive zone and
+    chances created per minute there (and the same in its own zone). A scoring chance is a shot on goal, missed shot or
+    goal from the home-plate area in front of the net (from the NHL's shot coordinates). Zone time in the team tables is
+    the NHL's EDGE tracking; the tests use an estimate from the play-by-play, chosen against EDGE on 2021-22 to 2023-24
+    and confirmed on 2024-25 and 2025-26. It tests whether chances predict games they have not seen, beyond shot share
+    and expected goals, and whether they help pick contenders:
+    ```
+    python scripts/build_zone_chances.py
+    ```
+    The workbook is `outputs/zone_chances.xlsx`: start with its "Verdict" sheet. The first run reads every season's
+    play-by-play (a few minutes) and saves copies in `data/zone/`.
 
 ## The play-by-play download (overnight)
 

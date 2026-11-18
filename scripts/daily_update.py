@@ -12,8 +12,8 @@ WHAT IT DOES:
       6. the contender fit                              build_contender_fit.py
       7. play-by-play of the new games, and the
          Breakouts "This season" table                  pull_play_by_play.py, build_breakout_now.py
-      8. NHL EDGE zone time and the breakout
-         efficiency index (BEI)                         pull_edge_zone_time.py, build_breakout_bei.py
+      8. NHL EDGE zone time, the breakout efficiency
+         index (BEI), zone time and scoring chances     pull_edge_zone_time.py, build_breakout_bei.py, build_zone_chances.py
       9. rebuild the web pages                          build_site.py
 
     Then it commits the changed pages (the docs/ folder only) and pushes them to GitHub, which publishes the site.
@@ -68,6 +68,7 @@ STEPS = [  # (script, plain name)
     ("build_breakout_now.py", "the Breakouts This season table"),
     ("pull_edge_zone_time.py", "this season's NHL EDGE zone time"),
     ("build_breakout_bei.py", "the breakout efficiency index (BEI)"),
+    ("build_zone_chances.py", "zone time and scoring chances"),
     ("build_site.py", "rebuild the web pages"),
 ]
 # Changes in these places mean someone is in the middle of work: a daily run must not publish on top of it.

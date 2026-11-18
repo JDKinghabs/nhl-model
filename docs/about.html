@@ -8,7 +8,7 @@
 <title>About - NHL Model</title>
 <meta name="description" content="Independent hockey analytics: who is really good, who is likely to miss the playoffs, and how teams change over a season.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏒</text></svg>">
-<link rel="stylesheet" href="style.css?v=0ee9d1cc">
+<link rel="stylesheet" href="style.css?v=53537484">
 </head>
 <body>
 <header class="site-header">
@@ -34,7 +34,7 @@
   <li><strong><a href="slow-starters.html">Slow starters</a></strong><span class="tag live">Live</span><br><span class="note">Which teams that began badly tend to recover, and what separated them from the ones that did not.</span></li>
   <li><strong><a href="goaltending.html">Goaltending in context</a></strong><span class="tag live">Live</span><br><span class="note">Whether a goalie is bailing out a weak defense or a strong defense is being let down, and whether a hot playoff goalie can be foreseen.</span></li>
   <li><strong><a href="breakouts.html">Breakouts</a></strong><span class="tag live">Live</span><br><span class="note">Whether teams that get out of their own end cleanly win more, measured with a breakout efficiency rating (BER) and other stats read from the play-by-play.</span></li>
-  <li><strong>Zone time</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone.</span></li>
+  <li><strong><a href="zone-chances.html">Zone time and chances</a></strong><span class="tag live">Live</span><br><span class="note">How much time each team spends in the offensive zone, and how many scoring chances it creates from that time.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
 
@@ -70,6 +70,9 @@
   <dt>Controlled exit</dt><dd>A breakout where the team is next seen beyond its blue line still holding the puck.</dd>
   <dt>Safe clear</dt><dd>A breakout where the puck gets out but the opponent has it, and it does not come straight back.</dd>
   <dt>BER</dt><dd>Breakout efficiency rating: 100 &times; (controlled exits + half the safe clears) &divide; breakout attempts. Read from play-by-play events, so it is an approximation.</dd>
+  <dt>Scoring chance</dt><dd>A shot on goal, missed shot or goal at 5-on-5 from the area in front of the net: from the goal posts out to the faceoff dots, then out to the top of the circles.</dd>
+  <dt>Chance share</dt><dd>A team's scoring chances divided by all scoring chances in its games.</dd>
+  <dt>Zone time</dt><dd>The share of 5-on-5 time spent in each zone, from the NHL's EDGE puck tracking (2021-22 on).</dd>
   <dt>BEI</dt><dd>Breakout efficiency index: own-zone giveaways per hour of own-zone time (45%), share of time in the own zone (30%) and transition shot attempts per 60 (25%), each as a league percentile. 0 to 100.</dd>
   <dt>Pinned-in spell</dt><dd>The opponent gets two or more shot attempts in a row, each within 30 seconds of the last, without play leaving the zone or stopping.</dd>
   <dt>Battle</dt><dd>A team's number minus its opponents' number in the same games: for example the pinned-in spells it suffers against the ones it inflicts.</dd>
@@ -89,9 +92,9 @@
   <div class="wrap">
     <p>Data: &copy; NHL, used for personal, non-commercial purposes. This is an independent hobby project, not affiliated with or endorsed by the NHL or any club.</p>
     <p>For information and entertainment only. Nothing here is betting or financial advice.</p>
-    <p>Page built Nov 17, 2026 at 10:31 PM ET.</p>
+    <p>Page built Nov 17, 2026 at 10:56 PM ET.</p>
   </div>
 </footer>
-<script src="site.js?v=0ee9d1cc"></script>
+<script src="site.js?v=53537484"></script>
 </body>
 </html>
