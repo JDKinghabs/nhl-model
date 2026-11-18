@@ -63,7 +63,7 @@ PROJECT_FOLDER = Path(__file__).resolve().parent.parent
 OUTPUT_FILE = PROJECT_FOLDER / "outputs" / "zone_chances.xlsx"
 EDGE_FILE = PROJECT_FOLDER / "data" / "nhl" / "edge" / "zone_time_regular.csv"
 CACHE = PROJECT_FOLDER / "data" / "zone"
-VERSION = 1                       # raise when the per-game counting changes, so saved copies are rebuilt
+VERSION = 2                       # raise when the per-game counting changes, so saved copies are rebuilt
 
 FIVE_ON_FIVE = "1551"
 SHOT_TYPES = ["shot-on-goal", "missed-shot", "goal"]           # unblocked shots: their x,y is where the shot was taken
@@ -78,6 +78,7 @@ VARIANTS = {  # name: (how the time between two events is split, longest gap cou
 # The measures shown and tested: (column, plain name, higher is better?)
 MEASURES = [
     ("chance_share", "Chance share (ours / both teams')", True),
+    ("chance_share_ng", "Chance share, not counting goals", True),
     ("cf60", "Chances for per 60", True),
     ("ca60", "Chances against per 60", False),
     ("oz_share", "Offensive-zone time (share of 5-on-5 time)", True),
@@ -143,8 +144,9 @@ def game_rows(ev):
     shots = ev[ev["situation_code"].eq(FIVE_ON_FIVE) & ev["type"].isin(SHOT_TYPES) & ev["zone"].eq("O") & ev["x"].notna()].copy()
     shots["chance"] = in_home_plate(shots["x"], shots["y"])
     shots["opp"] = shots["home_team_id"] + shots["away_team_id"] - shots["team_id"]
-    cf_ = shots.groupby(["game_id", "team_id"]).agg(cf=("chance", "sum"), ub_f=("chance", "size")).reset_index()
-    ca_ = shots.groupby(["game_id", "opp"]).agg(ca=("chance", "sum"), ub_a=("chance", "size")).reset_index().rename(columns={"opp": "team_id"})
+    shots["chance_goal"] = shots["chance"] & shots["type"].eq("goal")
+    cf_ = shots.groupby(["game_id", "team_id"]).agg(cf=("chance", "sum"), cg_f=("chance_goal", "sum"), ub_f=("chance", "size")).reset_index()
+    ca_ = shots.groupby(["game_id", "opp"]).agg(ca=("chance", "sum"), cg_a=("chance_goal", "sum"), ub_a=("chance", "size")).reset_index().rename(columns={"opp": "team_id"})
     for frame in (cf_, ca_):
         frame["team_id"] = frame["team_id"].astype(int)
     return rows.merge(cf_, on=["game_id", "team_id"], how="left").merge(ca_, on=["game_id", "team_id"], how="left").fillna(0)
@@ -184,7 +186,8 @@ def team_numbers(rows, variant, edge=None):
     """One row per team-season (or per whatever is in rows). Zone time from the estimate, or the real EDGE share if given."""
     g = rows.groupby(["season_id", "team_id"]).agg(
         games=("game_id", "nunique"), oz=(f"oz_{variant}", "sum"), nz=(f"nz_{variant}", "sum"), dz=(f"dz_{variant}", "sum"),
-        cf=("cf", "sum"), ca=("ca", "sum"), ub_f=("ub_f", "sum"), ub_a=("ub_a", "sum"), toi5=("toi5", "sum")).reset_index()
+        cf=("cf", "sum"), ca=("ca", "sum"), cg_f=("cg_f", "sum"), cg_a=("cg_a", "sum"), ub_f=("ub_f", "sum"), ub_a=("ub_a", "sum"),
+        toi5=("toi5", "sum")).reset_index()
     total = g[["oz", "nz", "dz"]].sum(axis=1)
     g["oz_share"], g["nz_share"], g["dz_share"] = g["oz"] / total, g["nz"] / total, g["dz"] / total
     if edge is not None:
@@ -194,6 +197,8 @@ def team_numbers(rows, variant, edge=None):
     g["cf_per10oz"] = g["cf"] / (minutes * g["oz_share"]) * 10
     g["ca_per10dz"] = g["ca"] / (minutes * g["dz_share"]) * 10
     g["chance_share"] = g["cf"] / (g["cf"] + g["ca"])
+    missed_f, missed_a = g["cf"] - g["cg_f"], g["ca"] - g["cg_a"]                 # the chances that did NOT go in
+    g["chance_share_ng"] = missed_f / (missed_f + missed_a)
     g["oz_min60"], g["dz_min60"] = g["oz_share"] * 60, g["dz_share"] * 60
     return g
 
@@ -320,6 +325,44 @@ def test_tables(rows, variant, nhl, seasons, season_table):
     return pd.DataFrame(repeat_rows), pd.DataFrame(unseen_rows), pd.DataFrame(both)
 
 
+TOP = 8          # "a top team": one of the league's 8 best by points % (about the top quarter)
+
+
+def winning_tables(t):
+    """Same season: each number's link with points % and goal difference, and how well its top 8 matches the real top 8."""
+    columns = MEASURES + [("corsi", "Yardstick: Corsi (shot-attempt share)", True), ("xg_share", "Yardstick: expected-goals share", True)]
+    links, tops = [], []
+    t = t.copy()
+    t["top_real"] = t.groupby("season_id")["pts_pct"].rank(ascending=False, method="first") <= TOP
+    for col, name, higher in columns:
+        sign = 1 if higher else -1
+        pts, gd = ps.season_spearman(t, col, "pts_pct") * sign, ps.season_spearman(t, col, "gd_pg") * sign
+        row = {"Statistic": name, "Link with points %": round(float(pts.mean()), 2), "Link with goal difference": round(float(gd.mean()), 2),
+               "Lowest season (points %)": round(float(pts.min()), 2), "Highest season (points %)": round(float(pts.max()), 2)}
+        if col != "corsi":
+            beyond = [partial(t[t["season_id"] == s], col, "pts_pct", ["corsi"]) * sign for s in sorted(t["season_id"].unique())]
+            row["Link with points %, beyond shot share"] = round(float(np.nanmean(beyond)), 2)
+        links.append(row)
+        rank = t.groupby("season_id")[col].rank(ascending=not higher, method="first")
+        top_stat = rank <= TOP
+        n_seasons = t["season_id"].nunique()
+        tops.append({"Statistic": name,
+                     f"Of the real top {TOP}, how many were top {TOP} in this stat (average a season)": round(float((top_stat & t["top_real"]).sum() / n_seasons), 1),
+                     f"Cup winners in its top {TOP}": f"{int((top_stat & (t['champion'] == 1)).sum())} of {int((t['champion'] == 1).sum())}",
+                     f"Conference finalists in its top {TOP}": f"{int((top_stat & (t['conf_finalist'] == 1)).sum())} of {int((t['conf_finalist'] == 1).sum())}",
+                     f"Average points % of its top {TOP}": round(float(t.loc[top_stat, "pts_pct"].mean()), 3),
+                     f"Average points % of its bottom {TOP}": round(float(t.loc[rank > t.groupby('season_id')[col].transform('count') - TOP, "pts_pct"].mean()), 3)})
+    both = []
+    for col, other, name in (("oz_share", "cf_per10oz", "Offensive-zone time"), ("cf_per10oz", "oz_share", "Chances per 10 minutes in the offensive zone"),
+                             ("dz_share", "ca_per10dz", "Own-zone time"), ("ca_per10dz", "dz_share", "Chances against per 10 minutes in the own zone")):
+        sign = -1 if col in ("dz_share", "ca_per10dz") else 1
+        v = np.array([partial(t[t["season_id"] == s], col, "pts_pct", [other]) * sign for s in sorted(t["season_id"].unique())])
+        both.append({"Statistic": name, "Link with points %, with the other part taken out": round(float(np.nanmean(v)), 2),
+                     "Noise margin": round(float(2 * np.nanstd(v, ddof=1) / np.sqrt(np.isfinite(v).sum())), 2),
+                     "How much the two parts move together": round(float(ps.season_spearman(t, col, other).mean()), 2)})
+    return pd.DataFrame(links), pd.DataFrame(tops), pd.DataFrame(both)
+
+
 def contender_test(rows, variant, nhl, seasons):
     """Each measure added on its own to the contender score (version 1), tried on seasons the score has never seen."""
     games_raw, seasons_tbl, checkpoints = cf.load(nhl)
@@ -382,43 +425,44 @@ def tables_for(t, season):
                          "Chance share": d["chance_share"].round(3), "Points %": d["pts_pct"].round(3), "How the season ended": d["outcome"]}).reset_index(drop=True)
 
 
-def verdict_lines(est_table, best, unseen, both, cont, champs, seasons, league):
-    u = unseen.set_index("Statistic")
+def verdict_lines(est_table, best, links, tops, both, cont, champs, seasons, league):
+    L = links.set_index("Statistic")
+    T = tops.set_index("Statistic")
     b = both.set_index("Statistic")
     best_row = est_table.set_index("Estimate").loc[best]
-
-    def g(name, col="Predicts unseen games"):
-        return float(u.loc[name, col])
-
-    share, corsi, xg = g("Chance share (ours / both teams')"), g("Yardstick: Corsi (shot-attempt share)"), g("Yardstick: expected-goals share")
-    beyond = u.loc["Chance share (ours / both teams')"]
+    share, share_ng = L.loc[MEASURES[0][1]], L.loc["Chance share, not counting goals"]
+    corsi, xg = L.loc["Yardstick: Corsi (shot-attempt share)"], L.loc["Yardstick: expected-goals share"]
+    overlap_col = f"Of the real top {TOP}, how many were top {TOP} in this stat (average a season)"
     oz_alone, rate_alone = b.loc["Offensive-zone time"], b.loc["Chances per 10 minutes in the offensive zone"]
     lines = [
         ("What was done", f"Scoring chances (shots from the home-plate area) and time in each zone at 5-on-5, for {len(seasons)} seasons "
                           f"({season_label(min(seasons))} to {season_label(max(seasons))}, without 2019-20 and 2020-21). League average: {league['cf60']:.1f} chances per 60 minutes, "
                           f"{league['share_of_unblocked']:.0%} of shots that reach the net or miss it, {league['per10']:.1f} chances per 10 minutes in the offensive zone."),
-        ("Short answer", f"Creating chances is what goes with winning. Chance share predicts the results of games it has not seen at {share:+.2f}, "
-                         f"against {corsi:+.2f} for shot-attempt share (Corsi) and {xg:+.2f} for expected goals. "
-                         + ("It still adds something after shot share is taken out" if beyond["Beyond shot share (Corsi)"] > beyond["Beyond shot share (Corsi): noise margin"] else "Once shot share is taken out, little is left")
-                         + f" ({beyond['Beyond shot share (Corsi)']:+.2f}, noise margin {beyond['Beyond shot share (Corsi): noise margin']:.2f}), and after expected goals as well "
-                         f"{beyond['Beyond shot share and expected goals']:+.2f} (margin {beyond['Beyond shot share and expected goals: noise margin']:.2f})."),
+        ("Short answer", f"Creating chances is what goes with winning. Over a season, chance share lines up with points % at {share['Link with points %']:+.2f} and with goal "
+                         f"difference at {share['Link with goal difference']:+.2f}, ahead of shot-attempt share (Corsi, {corsi['Link with points %']:+.2f}) and expected goals "
+                         f"({xg['Link with points %']:+.2f}). Leaving goals out, so that goals do not count on both sides, it is still {share_ng['Link with points %']:+.2f}."),
+        ("Does it pick out the top teams?", f"Of the league's top {TOP} teams by points % each season, on average {T.loc[MEASURES[0][1], overlap_col]:.1f} were also top {TOP} in chance share "
+                         f"({T.loc['Yardstick: Corsi (shot-attempt share)', overlap_col]:.1f} for Corsi, {T.loc['Yardstick: expected-goals share', overlap_col]:.1f} for expected goals; "
+                         f"a random pick would get about {TOP * TOP / 31:.1f}). {T.loc[MEASURES[0][1], f'Cup winners in its top {TOP}']} Cup winners and "
+                         f"{T.loc[MEASURES[0][1], f'Conference finalists in its top {TOP}']} conference finalists were in the top {TOP} for chance share."),
         ("Time in the zone, or what you do with it?", f"Both count, and they are different skills (they move together at only {oz_alone['How much the two parts move together']:+.2f}). "
-                         f"With the other taken out, offensive-zone time predicts unseen games at {oz_alone['Predicts unseen games, with the other part taken out']:+.2f} and chances per "
-                         f"minute in the zone at {rate_alone['Predicts unseen games, with the other part taken out']:+.2f} (noise margins about {oz_alone['Noise margin']:.2f})."),
+                         f"With the other taken out, offensive-zone time lines up with points % at {oz_alone['Link with points %, with the other part taken out']:+.2f} and chances per "
+                         f"minute in the zone at {rate_alone['Link with points %, with the other part taken out']:+.2f}."),
         ("The zone-time estimate", f"Four ways of estimating zone time from the play-by-play were compared with the NHL's tracking. The best on 2021-22 to 2023-24 "
                                    f"('{best_row['How the time between two events is split']}', gaps up to {int(best_row['Longest gap counted (seconds)'])} seconds) agreed at "
                                    f"{best_row['Choosing seasons: average']:+.2f}, and at {best_row['Confirming seasons: average']:+.2f} on 2024-25 and 2025-26, which it had not been chosen on. "
-                                   "The website's team tables use the NHL's real numbers; the tests use the estimate because they need game-by-game numbers."),
+                                   "The website's team tables use the NHL's real numbers; the tests use the estimate so they can go back to 2009-10."),
     ]
-    if len(cont[1]):
-        s = cont[1]["chance_share"]
-        lines.append(("Does it help pick contenders?", f"Added to the contender score and tried on seasons the score had not seen, chance share changes the AUC by {s[0]:+.3f} "
-                                                       f"(noise margin {s[1]:.3f}): " + ("more than the noise." if s[0] > s[1] else "within the noise.")))
     c = champs.set_index("How the season ended")
     key = MEASURES[0][1] + " (percentile)"
     if "Won Cup" in c.index:
         lines.append(("Champions", f"Cup winners averaged the {c.loc['Won Cup', key]:.0f}th percentile on chance share (100 = best), finalists the "
                                    f"{c.loc['Lost Cup final', key]:.0f}th, teams that missed the playoffs the {c.loc['Missed playoffs', key]:.0f}th."))
+    if len(cont[1]):
+        g = cont[1]["chance_share"]
+        lines.append(("Does it improve the contender score?", f"Added to the contender score, which already includes record, goal difference and shot share, chance share changes how "
+                                                              f"well it picks the conference finalists by {g[0]:+.3f} (noise margin {g[1]:.3f}): "
+                                                              + ("more than the noise." if g[0] > g[1] else "within the noise, because the score already holds most of this information.")))
     return pd.DataFrame(lines, columns=["", "Answer"])
 
 
@@ -464,14 +508,15 @@ def main():
 
     est_table, best = choose_estimate(finished[finished["season_id"].isin(CHOOSE_ON + CONFIRM_ON)], edge)
     print(f"Zone-time estimate chosen: {best}")
-    compare = bi.comparison_numbers(nhl, sorted(rows["season_id"].unique()))[["season_id", "team_id", "team", "pts_pct", "gd_pg", "corsi", "xg_share", "outcome"]]
+    compare = bi.comparison_numbers(nhl, sorted(rows["season_id"].unique()))[["season_id", "team_id", "team", "pts_pct", "gd_pg", "corsi", "xg_share", "outcome", "champion", "conf_finalist"]]
     season_table = team_numbers(finished, best).merge(compare, on=["season_id", "team_id"], how="left")
-    repeats, unseen, both = test_tables(finished, best, nhl, seasons, season_table)
+    repeats, unseen, _ = test_tables(finished, best, nhl, seasons, season_table)
+    links, tops, both = winning_tables(season_table)
     cont = contender_test(finished, best, nhl, seasons)
     champs = champions(season_table)
     league = {"cf60": float(season_table["cf60"].mean()), "share_of_unblocked": float(season_table["cf"].sum() / season_table["ub_f"].sum()),
               "per10": float(season_table["cf_per10oz"].mean())}
-    verdict = verdict_lines(est_table, best, unseen, both, cont, champs, seasons, league)
+    verdict = verdict_lines(est_table, best, links, tops, both, cont, champs, seasons, league)
 
     # the website's team tables: real NHL EDGE zone time, this season and last season
     real = team_numbers(rows[rows["season_id"] >= min(edge["season_id"])], best, edge=edge).merge(compare, on=["season_id", "team_id"], how="left")
@@ -484,16 +529,20 @@ def main():
                "Zone time: the share of 5-on-5 time in each zone. The team tables use the NHL's EDGE tracking (2021-22 on); the tests use an estimate from the play-by-play,",
                "chosen against EDGE on 2021-22 to 2023-24 and confirmed on 2024-25 and 2025-26 ('Estimate check').",
                "Chances per 10 minutes in the zone = chances / minutes spent in that zone x 10. Chance share = chances for / (for + against).",
-               "Tests are rank correlations within each season, averaged: 0 = no relationship, 1 = perfect. 'Predicts unseen games' compares the stat from odd-numbered games",
-               "with the results of even-numbered games (and the reverse), so it is not flattered by the fact that goals are chances too.", "",
+               "Tests are rank correlations within each season, averaged: 0 = no relationship, 1 = perfect. 'Goes with winning' compares a team's season with its points % and",
+               "goal difference. Goals are chances too, so the version 'not counting goals' shows the link without goals counting on both sides. 'Top teams' compares each",
+               f"stat's top {TOP} with the real top {TOP} by points %. 'Unseen games' (for reference) compares the stat from odd-numbered games with results of even-numbered games.", "",
                "Data: (c) NHL and NHL EDGE. 5-on-5 ice time, Corsi and expected goals: MoneyPuck.com."]
-    sheets = {"Verdict": verdict, "This season": this_season, "Last season": last_season, "Unseen games": unseen, "Time or what you do": both,
+    sheets = {"Verdict": verdict, "This season": this_season, "Last season": last_season, "Goes with winning": links, "Top teams": tops, "Time or what you do": both,
+              "Unseen games": unseen,
               "Repeats": repeats, "Contender test": cont[0], "Champions": champs, "Estimate check": est_table,
               "Team-seasons": season_table.sort_values(["season_id", "chance_share"], ascending=[False, False]).round(4)}
     notes = {"This season": f"Season {season_label(current)}: games through {through}. Zone time from NHL EDGE. Early in a season these numbers are noisy.",
              "Last season": f"Season {season_label(LAST_FINISHED)}. Zone time from NHL EDGE.",
              "Unseen games": "Each stat built from odd-numbered games against the results of even-numbered games (and the reverse); turned so positive = good. Noise margin = 2 standard errors across seasons.",
-             "Time or what you do": "Offensive-zone time and chances per minute in the zone, each with the other taken out, predicting unseen games.",
+             "Goes with winning": "Each stat's link with points % and goal difference in the same season (turned so positive = good), and what is left after shot share is taken out.",
+             "Top teams": f"How each stat's top {TOP} compares with the real top {TOP} by points % (a random pick would match about {TOP * TOP / 31:.1f} a season).",
+             "Time or what you do": "Offensive-zone time and chances per minute in the zone, each with the other taken out, against points % in the same season.",
              "Contender test": "Each measure added on its own to the contender score (version 1) and tried on seasons the score had not seen: change in AUC.",
              "Estimate check": "Rank agreement between the play-by-play estimate of zone time and the NHL's EDGE tracking, per season, averaged."}
     try:
@@ -508,7 +557,8 @@ def main():
     for _, r in verdict.iterrows():
         print(f"  [{r.iloc[0]}] {r.iloc[1]}")
     print("\nEstimate check:"); print(est_table.to_string(index=False))
-    print("\nUnseen games:"); print(unseen.to_string(index=False))
+    print("\nGoes with winning:"); print(links.to_string(index=False))
+    print("\nTop teams:"); print(tops.to_string(index=False))
     print("\nTime or what you do with it:"); print(both.to_string(index=False))
     print("\nRepeats:"); print(repeats.to_string(index=False))
     print("\nContender test:"); print(cont[0].to_string(index=False))

@@ -1285,7 +1285,8 @@ def zone_chances_page(standings, built_text):
     v = read_sheet(ZONE_FILE, "Verdict")
     now = read_sheet(ZONE_FILE, "This season", header=1)
     last = read_sheet(ZONE_FILE, "Last season", header=1)
-    unseen = read_sheet(ZONE_FILE, "Unseen games", header=1)
+    links = read_sheet(ZONE_FILE, "Goes with winning", header=1)
+    tops = read_sheet(ZONE_FILE, "Top teams", header=1)
     both = read_sheet(ZONE_FILE, "Time or what you do", header=1)
     repeats = read_sheet(ZONE_FILE, "Repeats")
     champs = read_sheet(ZONE_FILE, "Champions")
@@ -1313,13 +1314,15 @@ def zone_chances_page(standings, built_text):
     def pm(value, margin):
         return f"{float(value):+.2f} (+/-{float(margin):.2f})" if pd.notna(value) else "-"
 
-    unseen_rows = [[r["Statistic"], pm(r["Predicts unseen games"], r["Predicts unseen games: noise margin"]),
-                    pm(r["Beyond shot share (Corsi)"], r["Beyond shot share (Corsi): noise margin"]),
-                    pm(r["Beyond shot share and expected goals"], r["Beyond shot share and expected goals: noise margin"]),
-                    signed(r["Goes with winning, same season (points %)"])] for _, r in unseen.iterrows()]
-    unseen_table = static_table(["Statistic", "Predicts unseen games", "Beyond shot share", "Beyond shot share and expected goals", "Same season (flattered)"], unseen_rows)
-    both_rows = [[r["Statistic"], pm(r["Predicts unseen games, with the other part taken out"], r["Noise margin"])] for _, r in both.iterrows()]
-    both_table = static_table(["Part", "Predicts unseen games, with the other part taken out"], both_rows)
+    link_rows = [[r["Statistic"], signed(r["Link with points %"]), signed(r["Link with goal difference"]),
+                  f"{r['Lowest season (points %)']:+.2f} to {r['Highest season (points %)']:+.2f}",
+                  signed(r["Link with points %, beyond shot share"]) if pd.notna(r.get("Link with points %, beyond shot share")) else "-"] for _, r in links.iterrows()]
+    link_table = static_table(["Statistic", "Points %", "Goal difference", "Range across seasons (points %)", "Points %, beyond shot share"], link_rows)
+    tc = list(tops.columns)
+    top_rows = [[r[tc[0]], f"{r[tc[1]]:.1f} of 8", r[tc[2]], r[tc[3]], fmt_pct(r[tc[4]]), fmt_pct(r[tc[5]])] for _, r in tops.iterrows()]
+    top_table = static_table(["Statistic", "Top 8 caught", "Cup winners", "Conf. finalists", "P% of its top 8", "P% of its bottom 8"], top_rows)
+    both_rows = [[r["Statistic"], pm(r["Link with points %, with the other part taken out"], r["Noise margin"])] for _, r in both.iterrows()]
+    both_table = static_table(["Part", "Link with points %, with the other part taken out"], both_rows)
     repeat_rows = [[r["Statistic"], f"{r['Repeats (odd vs even games)']:.2f}", f"{r['Estimate for a full season']:.2f}"] for _, r in repeats.iterrows()]
     repeat_table = static_table(["Statistic", "Half a season vs the other half", "Estimate for a full season"], repeat_rows)
     pct_cols = [c for c in champs.columns if c.endswith("(percentile)")]
@@ -1352,15 +1355,20 @@ so these numbers are still noisy. Hover over a heading for what it means.</p>
 
 <h2>Time in the zone, or what you do with it?</h2>
 <p>A team's chances per 60 minutes are its share of time in the offensive zone times the chances it creates per minute there. The two parts move together only a little
-({signed(overlap)}), so a team can get its chances either way. Each part is tested here with the other taken out.</p>
+({signed(overlap)}), so a team can get its chances either way. Each part is compared with points % here with the other taken out; numbers in brackets are noise margins.</p>
 {both_table}
 
-<h2>Which numbers predict games they have not seen?</h2>
-<p>Each number is built from the odd-numbered games of a season and compared with the results (points % and goal difference) of the even-numbered games, and the other way
-round. That is the fair test: in the same games, chances and goals overlap because goals are chances too. "Beyond shot share" is what is left after taking out what
-shot-attempt share (Corsi) already explains. Numbers in brackets are noise margins; for numbers where lower is better (chances against, own-zone time) the sign is turned
-so that positive always means "goes with good results".</p>
-{unseen_table}
+<h2>Which numbers go with winning?</h2>
+<p>Each team's season next to its points % and goal difference, worked out within each season and averaged over 15 seasons (0 = no relationship, 1 = perfect). For numbers
+where lower is better (chances against, own-zone time) the sign is turned, so positive always means "goes with winning". Goals are chances too, which helps chance share
+line up with goal difference; "not counting goals" leaves them out. "Beyond shot share" is what is left after taking out what shot-attempt share (Corsi) already explains.</p>
+{link_table}
+
+<h2>Does it pick out the top teams?</h2>
+<p>Each season, the 8 teams with the best points % are "the top teams". For each number: "Top 8 caught" is how many of them were also in its own top 8, on average a season
+(a random pick would get about 2); "Cup winners" and "Conf. finalists" are how many of those (out of 15 and 60) it had in its top 8; the last two columns are how the
+teams it ranked top 8 and bottom 8 actually did.</p>
+{top_table}
 
 <h2>Do the numbers repeat?</h2>
 <p>The same number from one half of a season's games against the other half. The closer to 1, the more it is a real team trait rather than luck.</p>
@@ -1392,7 +1400,7 @@ on 2024-25 and 2025-26, which it had not been chosen on.</p>
 <ul>
   <li>The chance area is a fixed choice made before the tests, not tuned to the results. It uses shot location only: rebounds, rush chances and passes before the shot
   are not counted separately.</li>
-  <li>The same-season numbers are flattered, because goals are chances too. The unseen-games test is the fair one.</li>
+  <li>Goals are chances too, so chance share and goal difference partly move together by definition. The "not counting goals" line shows how much is left without that.</li>
   <li>Zone time in the tests is an estimate. It tracks the NHL's own numbers well but not perfectly, which makes the zone-time results a little weaker than they really are.</li>
   <li>A link is not proof of cause, and these are season-level results: they say how strong a team is, not who wins a single game.</li>
 </ul>
