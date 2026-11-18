@@ -58,8 +58,8 @@ Then commit and push the changed files in `docs/`. The pages show summary result
 ## Daily update (automatic)
 
 Every morning at 6:00 AM, Windows Task Scheduler runs `scripts/daily_update.py` on this computer. It refreshes
-tonight's games and the standings, this season's game results, the contender fit and the Breakouts "This season"
-table, rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
+tonight's games and the standings, this season's game results, the contender fit and the Breakouts tables for
+this season (BER and BEI), rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
 minutes and needs nothing from you.
 
 - **Safety rules.** If any step fails it stops and publishes nothing. It does not run at all if the project has unsaved
@@ -204,6 +204,16 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     That writes `outputs/breakout_blind_test.xlsx` and records the result in the frozen file. Finish line: the recipe
     predicts games it has not seen at 0.46 or better (Corsi's level); to count as a separate edge it must also add
     something after Corsi and expected goals are taken out.
+
+14. BEI, the breakout efficiency index (version 1): own-zone giveaways per hour of own-zone time (45%), share of
+    even-strength time in the own zone from NHL EDGE (30%) and transition shot attempts per 60 (25%), each as a league
+    percentile, for 2021-22 on (when EDGE zone time starts) and this season so far. It also checks how BEI lines up with
+    winning next to BER and Corsi:
+    ```
+    python scripts/pull_edge_zone_time.py
+    python scripts/build_breakout_bei.py
+    ```
+    The workbook is `outputs/breakout_bei.xlsx`. Both tables are on the Breakouts page.
 
 ## The play-by-play download (overnight)
 

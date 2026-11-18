@@ -287,6 +287,7 @@ def about_page(built_text):
   <dt>Controlled exit</dt><dd>A breakout where the team is next seen beyond its blue line still holding the puck.</dd>
   <dt>Safe clear</dt><dd>A breakout where the puck gets out but the opponent has it, and it does not come straight back.</dd>
   <dt>BER</dt><dd>Breakout efficiency rating: 100 &times; (controlled exits + half the safe clears) &divide; breakout attempts. Read from play-by-play events, so it is an approximation.</dd>
+  <dt>BEI</dt><dd>Breakout efficiency index: own-zone giveaways per hour of own-zone time (45%), share of time in the own zone (30%) and transition shot attempts per 60 (25%), each as a league percentile. 0 to 100.</dd>
   <dt>Pinned-in spell</dt><dd>The opponent gets two or more shot attempts in a row, each within 30 seconds of the last, without play leaving the zone or stopping.</dd>
   <dt>Battle</dt><dd>A team's number minus its opponents' number in the same games: for example the pinned-in spells it suffers against the ones it inflicts.</dd>
 </dl>
@@ -963,6 +964,7 @@ Early in a season these labels are noisy.</p>
 BREAKOUT_FILE = PROJECT_FOLDER / "outputs" / "breakout_round2.xlsx"
 BREAKOUT_INDEX_FILE = PROJECT_FOLDER / "outputs" / "breakout_index.xlsx"
 BREAKOUT_NOW_FILE = PROJECT_FOLDER / "outputs" / "breakout_now.xlsx"
+BREAKOUT_BEI_FILE = PROJECT_FOLDER / "outputs" / "breakout_bei.xlsx"
 BREAKOUT_FROZEN = PROJECT_FOLDER / "reference" / "breakout_metric_frozen.json"
 BREAKOUT_STATS = [  # (name in the workbook, what it counts)
     ("BER (breakout efficiency)", "Controlled exits, plus half credit for safe clears, as a share of the breakout attempts that could be judged."),
@@ -1116,11 +1118,77 @@ def breakouts_page(standings, built_text):
         now = read_sheet(BREAKOUT_NOW_FILE, "Right now", header=1)
         now_cols = [{**cols[0], "sub": lambda r: f"{int(r['Games'])} games"}] + cols[1:]
         now_html = f"""
-<h2>This season <span class="note">&middot; games through {esc(through_text(read_note(BREAKOUT_NOW_FILE)))}</span></h2>
+<h2>This season: BER <span class="note">&middot; games through {esc(through_text(read_note(BREAKOUT_NOW_FILE)))}</span></h2>
 <p class="note">Sorted by BER. Teams have played {int(now['Games'].min())} to {int(now['Games'].max())} games, so these numbers are still noisy: a first impression, not a verdict.
 "Own" and "Battle" are the two recipes described below, each compared with the other teams this season (0 = league average).
 Click a heading to sort by another column, and hover over it for what it means.</p>
 {team_table("breakout-now", now, now_cols, conference_map(standings))}
+"""
+
+    # --- BEI, the breakout efficiency index (written by build_breakout_bei.py), this season and last ---
+    bei_now_html = bei_last_html = bei_explain_html = ""
+    if BREAKOUT_BEI_FILE.exists():
+        bei_now = read_sheet(BREAKOUT_BEI_FILE, "This season", header=1)
+        bei_last = read_sheet(BREAKOUT_BEI_FILE, "Last season", header=1)
+        bei_test = read_sheet(BREAKOUT_BEI_FILE, "Test", header=1).set_index("Statistic")
+        bei_last_season = str(read_note(BREAKOUT_BEI_FILE, "Last season")).replace("Season ", "")
+        giveaway_col, zone_col, trans_col = ("Own-zone giveaways per hour of own-zone time", "Share of even-strength time in own zone",
+                                             "Transition shot attempts per 60")
+
+        def bei_cols(sub):
+            return [
+                {"label": "Team", "get": lambda r: r["Team"], "kind": "text", "first": "ascending", "sub": sub},
+                {"label": "BEI", "get": lambda r: r["BEI"], "kind": "num", "fmt": lambda x: f"{x:.1f}",
+                 "tip": "Breakout efficiency index, 0 to 100: the three parts as league percentiles, weighted 45 / 30 / 25"},
+                {"label": "DZ GA/hr", "get": lambda r: r[giveaway_col], "kind": "num", "fmt": lambda x: f"{x:.1f}", "first": "ascending",
+                 "tip": "Own-zone giveaways at 5-on-5 per hour of 5-on-5 time spent in the own zone (lower is better; 45% of BEI)"},
+                {"label": "Own zone", "get": lambda r: r[zone_col], "kind": "num", "fmt": lambda x: f"{x:.1%}", "first": "ascending",
+                 "tip": "Share of even-strength time spent in the own zone, from NHL EDGE puck tracking (lower is better; 30% of BEI)"},
+                {"label": "Trans/60", "get": lambda r: r[trans_col], "kind": "num", "fmt": lambda x: f"{x:.2f}",
+                 "tip": "Transition shot attempts per 60 minutes at 5-on-5 (higher is better; 25% of BEI)"},
+                {"label": "BER", "get": lambda r: r["BER"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "tip": "Breakout efficiency rating, for comparison"},
+                {"label": "P%", "get": lambda r: r["Points %"], "kind": "num", "fmt": fmt_pct, "tip": "Points percentage"},
+            ]
+
+        bei_now_html = f"""
+<h2>This season: BEI <span class="note">&middot; games through {esc(through_text(read_note(BREAKOUT_BEI_FILE, "This season")))}</span></h2>
+<p class="note">Sorted by BEI, the breakout efficiency index (version 1): own-zone giveaways, time spent in the own zone and transition shots, each as a league
+percentile, weighted 45 / 30 / 25. 100 would be best in the league at all three. Early in a season these numbers are noisy.</p>
+{team_table("bei-now", bei_now, bei_cols(lambda r: f"{int(r['Games'])} games"), conference_map(standings))}
+"""
+        bei_last_html = f"""
+<h2>Last season: BEI <span class="note">&middot; {esc(bei_last_season)}</span></h2>
+<p class="note">Sorted by BEI. Click a heading to sort by another column, and hover over it for what it means.</p>
+{team_table("bei-last", bei_last, bei_cols(lambda r: r["How the season ended"]), conference_map(standings))}
+"""
+        t = bei_test
+        part = {name: t.loc[name] for name in t.index}
+        bei_row, ber_row = part["BEI (breakout efficiency index)"], part["BER (breakout efficiency rating)"]
+        g_row, z_row, tr_row = (part["BEI part: own-zone giveaways per hour of own-zone time"], part["BEI part: share of time in own zone"],
+                                part["BEI part: transition shot attempts per 60"])
+        corsi_row = part["Yardstick: Corsi (shot-attempt share)"]
+        test_rows = [[name.replace("BEI part: ", "Part: ").replace("Yardstick: ", "Yardstick: "), signed(r["Link with points %"]), signed(r["Link with goal difference"]),
+                      f"{r['Lowest season (points %)']:+.2f} to {r['Highest season (points %)']:+.2f}"] for name, r in t.iterrows()]
+        bei_explain_html = f"""
+<h2>How BEI is built</h2>
+<p>BEI (breakout efficiency index, version 1) blends three numbers. Each is turned into a league percentile within the season (100 for the best team, 0 for the worst)
+and then weighted:</p>
+<ul>
+  <li><strong>45%: own-zone giveaways per hour of own-zone time</strong> (fewer is better). Giveaways in the team's own zone at 5-on-5, from the play-by-play,
+  divided by the hours of 5-on-5 play the team spent in its own zone.</li>
+  <li><strong>30%: share of time spent in the own zone</strong> (less is better), at even strength, from the NHL's EDGE puck and player tracking.</li>
+  <li><strong>25%: transition shot attempts per 60 minutes</strong> (more is better) at 5-on-5: a shot attempt within 5 seconds of play coming up the ice.</li>
+</ul>
+<p>NHL EDGE zone time starts in 2021-22, so BEI does too. The weights were set by hand; they were not fitted to the data or tested on seasons they were not set on.</p>
+<h3>How BEI lines up with winning</h3>
+<p>Each number below compares a team's rating with its points % and goal difference in the same season, on the {int(bei_row['Seasons'])} finished seasons with zone time.
+0 means no relationship, 1 a perfect one.</p>
+{static_table(["Statistic", "Points %", "Goal difference", "Range across seasons (points %)"], test_rows)}
+<p>Own-zone time does most of the work: on its own it lines up with winning at {signed(z_row['Link with points %'])}, more than BEI as a whole
+({signed(bei_row['Link with points %'])}). The giveaway part, which carries 45% of the weight, is barely linked with winning ({signed(g_row['Link with points %'])}),
+and transition shots only a little ({signed(tr_row['Link with points %'])}). On the same seasons BER is at {signed(ber_row['Link with points %'])} and Corsi at
+{signed(corsi_row['Link with points %'])}. Giving more weight to own-zone time would make BEI line up better with winning, but most of that is the same
+information as shot share.</p>
 """
 
     about_html = about_this_page("Do teams that get out of their own end cleanly win more? And is that anything more than out-shooting the opponent?", f"""Built from the NHL's play-by-play at 5-on-5: every faceoff, shot, hit, giveaway and takeaway, with where on the ice it happened.
@@ -1129,13 +1197,15 @@ within each season: 0 means no relationship, 1 a perfect one. Terms are explaine
 The Corsi and expected-goals yardsticks and 5-on-5 ice time are from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used here for non-commercial purposes with credit.""")
     body = f"""
 <h1>Breakouts</h1>
-<h2>What we found</h2>
-{found_html}
-
 {now_html}
-<h2>{'Last season' if now_html else 'Team by team'} <span class="note">&middot; {esc(season)}{'' if now_html else ', the last full season'}</span></h2>
+{bei_now_html}
+<h2>{'Last season: BER' if now_html else 'Team by team'} <span class="note">&middot; {esc(season)}{'' if now_html else ', the last full season'}</span></h2>
 <p class="note">Sorted by BER. Click a heading to sort by another column, and hover over it for what it means. "Own" and "Battle" are the two recipes described below.{'' if now_html else " This season's teams are not in the table yet."}</p>
 {team_table("breakout-table", latest, cols, conference_map(standings))}
+{bei_last_html}
+
+<h2>What we found (BER)</h2>
+{found_html}
 
 <h2>The stats, one by one</h2>
 <p>Each row is a team's own number. "Goes with winning" compares it with points % and goal difference in the same season. "Predicts unseen games" builds the stat from
@@ -1163,7 +1233,7 @@ so each breakout attempt is judged by the first telling event in the 20 seconds 
   <li><strong>Cannot be judged:</strong> nothing telling happens in time. These attempts are left out. About 4 in 10 attempts end up here.</li>
 </ul>
 <p>In {esc(season)}, of the attempts that could be judged, {share.iloc[0]:.0%} were controlled exits, {share.iloc[1]:.0%} safe clears and {share.iloc[2]:.0%} failed.</p>
-
+{bei_explain_html}
 {about_html}
 <h2>How it was tested, and the limits</h2>
 <ul>
@@ -1173,6 +1243,8 @@ so each breakout attempt is judged by the first telling event in the 20 seconds 
   <li>A link is not proof of cause: good teams may break out well because they are good, not the other way round.</li>
   <li>These are season-level results about how strong a team is. They say nothing about who wins a single game.</li>
   <li>With this many combinations tried, the numbers from the ten search seasons are flattered a little by the search. The blind test above is the fair judge.</li>
+  <li>BEI is a first version: its weights were set by hand and it has not been through the hold-out or blind tests that BER went through. Its transition count is this
+  site's own play-by-play version, so it will not match tracking-based transition numbers published elsewhere.</li>
 </ul>
 <p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL and MoneyPuck.com.</p>
 """
@@ -1250,7 +1322,7 @@ def main():
          "Is a goalie bailing out a weak defense, or a strong defense being let down by its goalie? And can anything foresee a hot playoff goalie?", "What repeats",
          "python scripts/build_goaltending_study.py"),
         (BREAKOUT_FILE, "breakouts.html", breakouts_page, "Breakouts",
-         "Do teams that get out of their own end cleanly win more, and is that anything more than out-shooting the opponent?", "Short answer",
+         "Do teams that get out of their own end cleanly win more, and is that anything more than out-shooting the opponent? Two measures: BER and BEI.", "Short answer",
          "python scripts/build_breakout_round2.py"),
     ]
     for workbook, filename, builder, title, question, key, command in study_pages:
