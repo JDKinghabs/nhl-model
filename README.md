@@ -55,6 +55,35 @@ python scripts/build_site.py
 
 Then commit and push the changed files in `docs/`. The pages show summary results only, never the raw data files.
 
+## Daily update (automatic)
+
+Every morning at 6:00 AM, Windows Task Scheduler runs `scripts/daily_update.py` on this computer. It refreshes
+tonight's games and the standings, this season's game results, the contender fit and the Breakouts "This season"
+table, rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
+minutes and needs nothing from you.
+
+- **Safety rules.** If any step fails it stops and publishes nothing. It does not run at all if the project has unsaved
+  changes to its code (`scripts/`, `reference/`, `README.md` ...) or commits that have not been pushed yet, because those
+  are waiting for an OK. It only ever commits files in `docs/`.
+- **The computer must be on or asleep at 6 AM.** If it is asleep, Windows wakes it (as long as wake timers are allowed in
+  the power settings). If it was off, the update runs soon after you next log on. It only runs while you are logged on
+  (a locked screen is fine).
+- **Did it work?** `data/daily/daily_update.log` has one line per run (PUBLISHED, SKIPPED with the reason, or FAILED with
+  the step). `data/daily/logs/<date>.log` has everything each step printed that day.
+- **Close the workbooks.** If `outputs/contender_fit.xlsx` or another workbook the update writes is open in Excel at
+  6 AM, that step cannot save and the run stops without publishing.
+- **Run it now:** `python scripts/daily_update.py` (or `--no-push` to refresh this computer without publishing).
+- **Set it up, change the time, or remove it** (for example on a new computer):
+  ```
+  powershell -ExecutionPolicy Bypass -File scripts\setup_daily_task.ps1
+  powershell -ExecutionPolicy Bypass -File scripts\setup_daily_task.ps1 -Time 7:30AM
+  powershell -ExecutionPolicy Bypass -File scripts\setup_daily_task.ps1 -Remove
+  ```
+  To pause it: Task Scheduler > Task Scheduler Library > "NHL Model daily update" > Disable.
+
+The other research pages (Red flags, Slow starters, Goaltending in context) are not part of the daily update: they
+need the MoneyPuck files, which are downloaded by hand.
+
 ## Rebuilding the data
 
 The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). To recreate it:
