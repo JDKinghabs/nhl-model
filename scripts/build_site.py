@@ -226,8 +226,6 @@ def standings_section(standings):
 def home_page(schedule, standings, built_text):
     body = f"""
 <h1>{esc(SITE_NAME)}</h1>
-<p class="lead">{esc(TAGLINE)}</p>
-<p class="note">Tonight's games and the standings. Also: <a href="contender-fit.html">Contender fit</a>, how each team's season so far compares with teams that went on to reach the conference finals, and the <a href="studies.html">Studies</a>: red flags, slow starters, goaltending in context and breakouts. See <a href="about.html">About</a> for what the terms mean.</p>
 {games_section(schedule, standings)}
 {standings_section(standings)}
 """
@@ -237,7 +235,6 @@ def home_page(schedule, standings, built_text):
 def about_page(built_text):
     body = """
 <h1>About this project</h1>
-<p class="lead">A hockey analytics project built to understand the sport better, one question at a time.</p>
 
 <div class="prose">
 <h2>What this is</h2>
@@ -549,12 +546,11 @@ do meet it do not win. It narrows the field; it does not find the winner.</p>"""
 
 
 def contender_page(data, standings, built_text):
+    about_html = about_this_page("How closely does each team's season so far look like the seasons of teams that went on to reach the conference finals?", f"""Version 1, built from NHL team statistics for 15 past seasons. It is an estimate from past patterns,
+not a prediction of who will win the Cup, and not odds or a betting line. The next versions will add shot quality,
+zone time and goaltending in context.""")
     body = f"""
 <h1>Contender fit</h1>
-<p class="lead">How closely does each team's season so far look like the seasons of teams that went on to reach the conference finals?</p>
-<p class="note">Version 1, built from NHL team statistics for 15 past seasons. It is an estimate from past patterns,
-not a prediction of who will win the Cup, and not odds or a betting line. The next versions will add shot quality,
-zone time and goaltending in context.</p>
 {right_now_section(data["right"], data["note"], standings)}
 {verdict_section(data["verdict"], data["score"])}
 {profile_section(data["profile"])}
@@ -565,6 +561,7 @@ zone time and goaltending in context.</p>
   <li>How much of the game a team spends in the offensive zone, and how cleanly it breaks out.</li>
   <li>Depth: a top-line center, an elite defense pair, or a goalie who gets hot in the playoffs.</li>
 </ul>
+{about_html}
 <p class="note">Method and code are public: <a href="{REPO_URL}">{REPO_URL.replace('https://', '')}</a>. Data: &copy; NHL.
 Shot-quality data from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a> will be credited here when it is added.</p>
 """
@@ -603,6 +600,15 @@ def first_sentence(text, limit=330):
     if len(sentence) > limit:
         sentence = sentence[:limit].rsplit(" ", 1)[0] + "..."
     return sentence
+
+
+def about_this_page(question, text):
+    """The page's question and notes, shown near the bottom instead of under the title. text may contain links (HTML)."""
+    return f"""
+<h2>About this page</h2>
+<p><strong>The question:</strong> {esc(question)}</p>
+<p class="note">{text}</p>
+"""
 
 
 def web_text(text):
@@ -724,12 +730,10 @@ def red_flags_page(standings, built_text):
         {"label": "GP", "get": lambda r: r["Games played"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Games played"},
         {"label": "Last 10", "get": lambda r: r["Last 10 (points)"], "kind": "text", "tip": "Points won in the last 10 games"},
     ]
+    about_html = about_this_page("Being in a playoff spot is not the same as being safe. Do warning signs make a team that is \"in\" more likely to miss?", f"""Six warning signs, checked on teams that were in a playoff spot at Thanksgiving, Jan 1 or the trade deadline in 15 past seasons
+(2009-10 on). A flag is a reason to look closer, not a prediction. Terms such as cushion, PDO and AUC are explained on the <a href="about.html">About</a> page.""")
     body = f"""
 <h1>Red flags</h1>
-<p class="lead">Being in a playoff spot is not the same as being safe. Do warning signs make a team that is "in" more likely to miss?</p>
-<p class="note">Six warning signs, checked on teams that were in a playoff spot at Thanksgiving, Jan 1 or the trade deadline in 15 past seasons
-(2009-10 on). A flag is a reason to look closer, not a prediction. Terms such as cushion, PDO and AUC are explained on the <a href="about.html">About</a> page.</p>
-
 <h2>Right now <span class="note">&middot; teams in a playoff spot, games through {esc(through_text(note))}</span></h2>
 <p class="note">Sorted by number of flags, then by how thin the cushion is. Early in a season (about 20 games) flags are noisy.</p>
 {team_table("flags-table", right, cols, conference_map(standings))}
@@ -749,6 +753,7 @@ means flagged teams missed more than equally safe teams at all three checkpoints
 <h2>What the flags mean</h2>
 <dl class="glossary">{definitions}</dl>
 
+{about_html}
 <h2>How it was tested, and the limits</h2>
 <ul>
   <li>The six flags and their cut-offs (top or bottom quarter of the league that season) were fixed before looking at results.</li>
@@ -827,12 +832,10 @@ def slow_starters_page(standings, built_text):
         {"label": "GP", "get": lambda r: r["Games played"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Games played"},
         {"label": "Signs", "get": lambda r: r["Number of signs"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Number of signs of a coming recovery"},
     ]
+    about_html = about_this_page("A team out of a playoff spot at Thanksgiving: how often does it recover, what does it take, and is there any sign of which ones will?", f"""Teams that were out of a playoff spot at Nov 1, Thanksgiving, Jan 1 or the trade deadline in 15 past seasons (2009-10 on).
+A slow start is a reason to check how far behind a team is and what pace it needs, not a prediction. Terms such as cut line and AUC are explained on the <a href="about.html">About</a> page.""")
     body = f"""
 <h1>Slow starters</h1>
-<p class="lead">A team out of a playoff spot at Thanksgiving: how often does it recover, what does it take, and is there any sign of which ones will?</p>
-<p class="note">Teams that were out of a playoff spot at Nov 1, Thanksgiving, Jan 1 or the trade deadline in 15 past seasons (2009-10 on).
-A slow start is a reason to check how far behind a team is and what pace it needs, not a prediction. Terms such as cut line and AUC are explained on the <a href="about.html">About</a> page.</p>
-
 <h2>Right now <span class="note">&middot; teams out of a playoff spot, games through {esc(through_text(note))}</span></h2>
 <p class="note">"Needs" is the points % the team must earn in its remaining games to reach the typical final cut line. Early in a season the signs are noisy.</p>
 {team_table("slow-table", right, cols, conference_map(standings))}
@@ -857,6 +860,7 @@ A slow start is a reason to check how far behind a team is and what pace it need
 <p>Of the {len(who)} teams out of a spot at Thanksgiving that recovered, these went all the way to the final.</p>
 {final_table}
 
+{about_html}
 <h2>How it was tested, and the limits</h2>
 <ul>
   <li>Each team with a sign is compared with teams the same distance behind, so a sign cannot win just by meaning "only slightly behind".</li>
@@ -911,13 +915,11 @@ def goaltending_page(standings, built_text):
         {"label": "xGA", "get": lambda r: r["Expected goals against"], "kind": "num", "fmt": lambda x: f"{x:.1f}", "tip": "Expected goals against"},
         {"label": "GP", "get": lambda r: r["Games played"], "kind": "num", "fmt": lambda x: str(int(x)), "tip": "Games played"},
     ]
+    about_html = about_this_page("Is a goalie bailing out a weak defense, or is a strong defense being let down by its goalie? And can anything foresee a hot playoff goalie?", f"""Goals against split into two parts with MoneyPuck's shot-quality data: <strong>defense</strong> (how many goals the shots allowed should produce:
+expected goals against per 60 minutes at 5-on-5) and <strong>goaltending</strong> (goals saved above expected, "GSAx"). 15 past seasons, 2009-10 on.
+Terms are explained on the <a href="about.html">About</a> page. {MONEYPUCK_NOTE}""")
     body = f"""
 <h1>Goaltending in context</h1>
-<p class="lead">Is a goalie bailing out a weak defense, or is a strong defense being let down by its goalie? And can anything foresee a hot playoff goalie?</p>
-<p class="note">Goals against split into two parts with MoneyPuck's shot-quality data: <strong>defense</strong> (how many goals the shots allowed should produce:
-expected goals against per 60 minutes at 5-on-5) and <strong>goaltending</strong> (goals saved above expected, "GSAx"). 15 past seasons, 2009-10 on.
-Terms are explained on the <a href="about.html">About</a> page. {MONEYPUCK_NOTE}</p>
-
 <h2>Right now <span class="note">&middot; games through {esc(through_text(note))}</span></h2>
 <p class="note">Teams are labeled "both good", "goalie bailing out the defense", "defense let down by the goalie" or "both weak" by whether each part is above or below the league median.
 Early in a season these labels are noisy.</p>
@@ -942,6 +944,7 @@ Early in a season these labels are noisy.</p>
 <p>The ten playoff runs with the most goals saved above expected, and where that team's goaltending ranked among the 16 playoff teams in the regular season.</p>
 {hot_table}
 
+{about_html}
 <h2>How it was tested, and the limits</h2>
 <ul>
   <li>The team numbers blend every goalie a team used, including the backup. Playoff data for individual goalies is not in the free files.</li>
@@ -1118,14 +1121,12 @@ Click a heading to sort by another column, and hover over it for what it means.<
 {team_table("breakout-now", now, now_cols, conference_map(standings))}
 """
 
-    body = f"""
-<h1>Breakouts</h1>
-<p class="lead">Do teams that get out of their own end cleanly win more? And is that anything more than out-shooting the opponent?</p>
-<p class="note">Built from the NHL's play-by-play at 5-on-5: every faceoff, shot, hit, giveaway and takeaway, with where on the ice it happened.
+    about_html = about_this_page("Do teams that get out of their own end cleanly win more? And is that anything more than out-shooting the opponent?", f"""Built from the NHL's play-by-play at 5-on-5: every faceoff, shot, hit, giveaway and takeaway, with where on the ice it happened.
 Ten regular seasons, 2014-15 to 2025-26 (2019-20 and 2020-21 are left out as unusual seasons). Every number in the tables is a correlation worked out on the teams' rankings
 within each season: 0 means no relationship, 1 a perfect one. Terms are explained on the <a href="about.html">About</a> page.
-The Corsi and expected-goals yardsticks and 5-on-5 ice time are from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used here for non-commercial purposes with credit.</p>
-
+The Corsi and expected-goals yardsticks and 5-on-5 ice time are from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, used here for non-commercial purposes with credit.""")
+    body = f"""
+<h1>Breakouts</h1>
 <h2>What we found</h2>
 {found_html}
 
@@ -1161,6 +1162,7 @@ so each breakout attempt is judged by the first telling event in the 20 seconds 
 </ul>
 <p>In {esc(season)}, of the attempts that could be judged, {share.iloc[0]:.0%} were controlled exits, {share.iloc[1]:.0%} safe clears and {share.iloc[2]:.0%} failed.</p>
 
+{about_html}
 <h2>How it was tested, and the limits</h2>
 <ul>
   <li>These are event counts, not puck tracking. A clean exit often leaves no event behind, while a shot against is always recorded, so failures are over-counted.
@@ -1184,16 +1186,16 @@ def studies_page(available, built_text):
         for title, href, question, headline in available)
     body = f"""
 <h1>Studies</h1>
-<p class="lead">Each study asks one hockey question of up to 15 seasons of NHL data (2009-10 on), tests the answer on seasons it has not seen,
-and says plainly when the evidence is thin.</p>
-<p class="note">Every page has a team-by-team list and a plain-English summary of what the history says.
-The pages are estimates from past patterns, not predictions or betting advice.</p>
 <ul class="roadmap">{cards}</ul>
 <h2>Coming next</h2>
 <ul class="roadmap">
   <li><strong>Zone time</strong><span class="tag">Planned</span><br><span class="note">How much of the game a team spends in the offensive zone.</span></li>
   <li><strong>Team profiles over time</strong><span class="tag">Planned</span><br><span class="note">How each team's strengths and weaknesses change as the season goes on.</span></li>
 </ul>
+<h2>About these studies</h2>
+<p class="note">Each study asks one hockey question of up to 15 seasons of NHL data (2009-10 on), tests the answer on seasons it has not seen,
+and says plainly when the evidence is thin. Every page has a team-by-team list and a plain-English summary of what the history says.
+The pages are estimates from past patterns, not predictions or betting advice.</p>
 """
     return page("Studies - " + SITE_NAME, "studies", body, built_text)
 
