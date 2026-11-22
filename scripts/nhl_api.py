@@ -46,6 +46,41 @@ def get_json_with_status(url, params=None, tries=3):
             time.sleep(2 * attempt)
 
 
+PAGE_SIZE = 100              # the NHL stats site sends at most 100 rows per request (since November 2026), whatever "limit" asks for
+
+
+def get_all_rows(url, params, sort_by, page_size=PAGE_SIZE):
+    """
+    For the NHL stats site (api.nhle.com/stats/rest): ask for every row of a table, one page of up to 100 rows at a time,
+    until the number of rows the site says exist ("total") has arrived. sort_by is a list of column names that make the
+    order fixed from page to page (for example ["gameId", "teamId"]), so no row is skipped or sent twice.
+    Returns the list of rows, or None if any page could not be fetched (so a half-finished table is never saved).
+    """
+    import json
+    rows, start, total = [], 0, None
+    sort = json.dumps([{"property": name, "direction": "ASC"} for name in sort_by])
+    while total is None or start < total:
+        raw = get_json(url, params={**params, "start": start, "limit": page_size, "sort": sort})
+        if raw is None:
+            return None
+        page = raw.get("data", [])
+        total = int(raw.get("total", len(page)))
+        if not page:
+            break
+        rows.extend(page)
+        start += len(page)
+    if total is not None and len(rows) < total:
+        print(f"  Warning: the site said {total} rows but sent {len(rows)}.")
+        return None
+    seen, unique = set(), []
+    for row in rows:                                   # a safety net: never keep the same row twice
+        key = tuple(row.get(name) for name in sort_by)
+        if key not in seen:
+            seen.add(key)
+            unique.append(row)
+    return unique
+
+
 def get_json(url, params=None, tries=3, quiet_404=False):
     """
     Download a web address that returns data and give it back as Python data.

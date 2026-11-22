@@ -72,10 +72,8 @@ def current_start_year():
 # ----------------------------------------------------------------------------
 def get_regular_season_teams(season_id):
     """One row per team for the regular season (wins, points, goals ...)."""
-    params = {"isAggregate": "false", "isGame": "false", "start": 0, "limit": -1,
-              "cayenneExp": f"gameTypeId=2 and seasonId={season_id}"}
-    raw = nhl_api.get_json(SUMMARY_URL, params=params)
-    return (raw or {}).get("data", [])
+    params = {"isAggregate": "false", "isGame": "false", "cayenneExp": f"gameTypeId=2 and seasonId={season_id}"}
+    return nhl_api.get_all_rows(SUMMARY_URL, params, sort_by=["teamId"]) or []          # page by page: the site sends at most 100 rows a request
 
 
 def get_series(season_id, end_year):

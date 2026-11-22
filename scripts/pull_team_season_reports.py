@@ -93,14 +93,10 @@ def download(report, season_id, game_type):
     params = {
         "isAggregate": "false",
         "isGame": "false",       # false = one row per team for the whole season
-        "start": 0,
-        "limit": -1,             # -1 = every row
         "cayenneExp": f"gameTypeId={game_type} and seasonId={season_id}",
     }
-    raw = nhl_api.get_json(URL.format(report=report), params=params)
-    if raw is None:
-        return None
-    return raw.get("data", [])
+    # The site sends at most 100 rows per request, so this asks page by page until every row has arrived
+    return nhl_api.get_all_rows(URL.format(report=report), params, sort_by=["teamId"])
 
 
 def pull_one_report(report, game_type, this_year, log, force):
