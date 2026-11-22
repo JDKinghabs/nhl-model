@@ -191,6 +191,10 @@ MATCHUP_ROWS = [  # (section, label, away column, home column, format); None as 
     ("Special teams", "Power play %", "pp_pct", "pp_pct", "pct1"),
     ("Special teams", "Penalty kill %", "pk_pct", "pk_pct", "pct1"),
     ("Special teams", "Power kill (PP% + PK%)", "power_kill", "power_kill", "1"),
+    ("Goaltending and defense", "Goals saved above expected (GSAx)", "gsax", "gsax", "signed1"),
+    ("Goaltending and defense", "Defense rank (quality of shots allowed)", "defense_rank", "defense_rank", "rankonly"),
+    ("Goaltending and defense", "Goaltending rank (GSAx per 60)", "goalie_rank", "goalie_rank", "rankonly"),
+    ("Goaltending and defense", "Goalie and defense together", "goalie_label", "goalie_label", None),
     ("Contender fit", "Final-four chance (contender fit)", "fit", "fit", "fitpct"),
 ]
 
@@ -203,6 +207,11 @@ def read_profiles():
     teams = pd.read_excel(PROFILES_FILE, sheet_name="Teams", header=1)
     teams["record"] = teams["w"].astype(int).astype(str) + "-" + teams["l"].astype(int).astype(str) + "-" + teams["otl"].astype(int).astype(str)
     games = pd.read_excel(PROFILES_FILE, sheet_name="Games")
+    try:
+        notes = pd.read_excel(PROFILES_FILE, sheet_name="Notes").set_index("Item")["Value"].to_dict()
+    except ValueError:
+        notes = {}
+    teams.attrs["goalie_through"] = str(notes.get("goalie_through") or "")
     return teams.set_index("team"), games, note
 
 
@@ -212,8 +221,8 @@ def fmt_matchup(value, kind):
     if kind is None:
         return str(value)
     v = float(value)
-    return {"pct3": fmt_pct(v), "pct1": f"{v:.1%}", "signed2": f"{v:+.2f}", "2": f"{v:.2f}", "1": f"{v:.1f}",
-            "pdo": f"{v * 100:.1f}", "fitpct": f"{v:.1f}%"}[kind]
+    return {"pct3": fmt_pct(v), "pct1": f"{v:.1%}", "signed2": f"{v:+.2f}", "signed1": f"{v:+.1f}", "2": f"{v:.2f}", "1": f"{v:.1f}",
+            "pdo": f"{v * 100:.1f}", "fitpct": f"{v:.1f}%", "rankonly": f"#{int(v)}"}[kind]
 
 
 def short_date(text):
@@ -240,7 +249,10 @@ def matchup_panel(g, teams, games, through):
         if a_col not in teams.columns or h_col not in teams.columns:
             continue
         if sec != section:
-            rows.append(f'<tr class="section"><td colspan="3">{esc(sec)}</td></tr>')
+            heading = sec
+            if sec == "Goaltending and defense" and teams.attrs.get("goalie_through"):
+                heading = f"{sec} (MoneyPuck data, games through {short_date(teams.attrs['goalie_through'])})"
+            rows.append(f'<tr class="section"><td colspan="3">{esc(heading)}</td></tr>')
             section = sec
         cells = []
         a_rank = a.get(f"rank_{a_col}") if kind else None
@@ -249,7 +261,7 @@ def matchup_panel(g, teams, games, through):
         if a_rank is not None and h_rank is not None and pd.notna(a_rank) and pd.notna(h_rank) and a_rank != h_rank:
             better = "away" if a_rank < h_rank else "home"
         for side, team, col, rank in (("away", a, a_col, a_rank), ("home", h, h_col, h_rank)):
-            rank_text = f' <span class="rk">#{int(rank)}</span>' if rank is not None and pd.notna(rank) else ""
+            rank_text = f' <span class="rk">#{int(rank)}</span>' if kind != "rankonly" and rank is not None and pd.notna(rank) else ""
             cls = ' class="better"' if better == side else ""
             cells.append(f"<td{cls}>{esc(fmt_matchup(team.get(col), kind))}{rank_text}</td>")
         rows.append(f'<tr><td class="left">{esc(label)}</td>{"".join(cells)}</tr>')

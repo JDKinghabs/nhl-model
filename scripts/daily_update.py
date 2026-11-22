@@ -65,6 +65,7 @@ STEPS = [  # (script, plain name)
     ("build_database.py", "rebuild the database"),
     ("load_moneypuck.py", "add the MoneyPuck tables back"),
     ("build_contender_fit.py", "the contender fit"),
+    ("build_goaltending_study.py", "goaltending in context (uses the latest MoneyPuck files on this computer)"),
     ("pull_play_by_play.py", "play-by-play of the new games"),
     ("build_breakout_now.py", "the Breakouts This season table"),
     ("pull_edge_zone_time.py", "this season's NHL EDGE zone time"),

@@ -6,7 +6,8 @@ WHAT IT DOES (in Excel terms):
     record (overall, at home, on the road, last 10, streak), goals and shots for and against per game (overall, at
     home and on the road), shooting % and save %, shot-attempt share (Corsi), the scoring-chance numbers from the
     Zone time study, BER and BEI from the Breakouts study, the power play and penalty kill, and the contender-fit
-    rank. Every number also gets a league rank (1 = best). A second sheet lists every game this season, so the page
+    rank, and from the Goaltending in context study goals saved above expected (GSAx), the defense rank (shot
+    quality allowed) and the goaltending rank. Every number also gets a league rank (1 = best). A second sheet lists every game this season, so the page
     can show each team's last 5 results and the season series between the two teams.
 
     It shows the season so far. It does NOT predict tonight's score, a total or a winner: projections like that are
@@ -24,6 +25,7 @@ DATA CREDIT:
     Data is (c) NHL, used here for personal, non-commercial purposes.
 """
 
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -43,7 +45,7 @@ RANKED = {
     "sf_pg": True, "sa_pg": False, "sf_pg_home": True, "sf_pg_road": True, "sa_pg_home": False, "sa_pg_road": False,
     "sh_pct": True, "sv_pct": True, "sv_pct_home": True, "sv_pct_road": True, "pdo": True,
     "corsi": True, "chance_share": True, "cf60": True, "ca60": False, "oz_min60": True, "ber": True, "bei": True,
-    "pp_pct": True, "pk_pct": True, "power_kill": True, "fit": True,
+    "pp_pct": True, "pk_pct": True, "power_kill": True, "fit": True, "gsax": True,
 }
 
 
@@ -110,6 +112,17 @@ def main():
     if fit is not None:
         t = t.merge(fit.rename(columns={"Team": "team_name", "Final-four chance (model)": "fit"})[["team_name", "fit"]], on="team_name", how="left")
 
+    goal = read_optional(OUTPUTS / "goaltending_in_context.xlsx", "Right now")
+    goalie_through = ""
+    if goal is not None:
+        t = t.merge(goal.rename(columns={"Team": "team_name", "GSAx (goals)": "gsax", "Defense rank (1 = best)": "defense_rank",
+                                         "Goaltending rank (1 = best)": "goalie_rank", "Label": "goalie_label"})[
+            ["team_name", "gsax", "defense_rank", "goalie_rank", "goalie_label"]], on="team_name", how="left")
+        t["rank_defense_rank"], t["rank_goalie_rank"] = t["defense_rank"], t["goalie_rank"]       # these two are ranks already
+        note = str(pd.read_excel(OUTPUTS / "goaltending_in_context.xlsx", sheet_name="Right now", header=None, nrows=1).iloc[0, 0])
+        found = re.search(r"games through (\d{4}-\d{2}-\d{2})", note)
+        goalie_through = found.group(1) if found else ""
+
     for col, higher in RANKED.items():
         if col in t:
             t[f"rank_{col}"] = t[col].rank(ascending=not higher, method="min")
@@ -137,7 +150,8 @@ def main():
     through = g["game_date"].max()
     cols = ["team", "team_name", "conference", "gp", "w", "l", "otl", "home", "road", "l10", "streak", "gd"] + \
            [c for c in RANKED if c in t] + [f"rank_{c}" for c in RANKED if c in t] + \
-           [c for c in ("gf_pg_home", "gf_pg_road", "ga_pg_home", "ga_pg_road", "sh_pct_home", "sh_pct_road") if c in t]
+           [c for c in ("gf_pg_home", "gf_pg_road", "ga_pg_home", "ga_pg_road", "sh_pct_home", "sh_pct_road",
+                        "defense_rank", "goalie_rank", "rank_defense_rank", "rank_goalie_rank", "goalie_label") if c in t]
     out = t[cols].sort_values("pts_pct", ascending=False)
     try:
         OUTPUTS.mkdir(exist_ok=True)
@@ -146,6 +160,7 @@ def main():
                 writer, sheet_name="Teams", index=False, header=False)
             out.round(4).to_excel(writer, sheet_name="Teams", index=False, startrow=1)
             games.to_excel(writer, sheet_name="Games", index=False)
+            pd.DataFrame({"Item": ["games_through", "goalie_through"], "Value": [through, goalie_through]}).to_excel(writer, sheet_name="Notes", index=False)
     except PermissionError:
         print(f"Could not save {OUTPUT_FILE.name}. Is it open in Excel? Close it and run again.")
         return 1
