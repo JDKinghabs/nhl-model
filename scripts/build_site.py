@@ -119,7 +119,7 @@ def nice_date(date_text):
 # ----------------------------------------------------------------------------
 # Tonight's games
 # ----------------------------------------------------------------------------
-def games_section(schedule, standings):
+def games_section(schedule, standings, profiles=(None, None, None)):
     if schedule.empty:
         return "<h2>Tonight</h2><p class='note'>No games found on this week's schedule.</p>"
 
@@ -128,9 +128,15 @@ def games_section(schedule, standings):
     heading = "Tonight" if bool(first["is_today"]) else "Next games"
     sub = nice_date(first["game_date"])
 
-    cards = []
+    teams, games, note = profiles
+    through = through_text(note) if note else ""
+    cards, panels = [], []
     for _, g in schedule.iterrows():
         live = g["status"] == "In progress"
+        panel = matchup_panel(g, teams, games, through) if teams is not None else ""
+        panels.append(panel)
+        toggle = (f'\n      <button type="button" class="game-toggle" data-panel="m-{esc(g["game_id"])}" aria-expanded="false" '
+                  f'aria-controls="m-{esc(g["game_id"])}">Matchup</button>') if panel else ""
         if pd.isna(g["away_score"]):
             status = g["status"]
         else:
@@ -143,13 +149,129 @@ def games_section(schedule, standings):
         <span>{esc(g['home'])}</span> <span class="rec">{esc(records.get(g['home'], ''))}</span>
       </div>
       <div class="meta"><time datetime="{esc(g['start_utc'])}" data-local>{esc(g['start_et'])}</time> &middot; {esc(g['venue'])}</div>
-      <div class="status{' live' if live else ''}">{status}</div>
+      <div class="status{' live' if live else ''}">{status}</div>{toggle}
     </li>""")
 
     return f"""
 <h2>{heading} <span class="note">&middot; {esc(sub)}</span></h2>
 <ul class="games">{''.join(cards)}
-</ul>"""
+</ul>
+<div class="match-panels" aria-live="polite">{''.join(panels)}</div>"""
+
+
+# ----------------------------------------------------------------------------
+# Matchup panels: click a game to compare the two teams (season so far; no projections)
+# ----------------------------------------------------------------------------
+PROFILES_FILE = PROJECT_FOLDER / "outputs" / "team_profiles.xlsx"
+
+MATCHUP_ROWS = [  # (section, label, away column, home column, format); None as the format = text with no rank
+    ("Record", "Record", "record", "record", None),
+    ("Record", "Points %", "pts_pct", "pts_pct", "pct3"),
+    ("Record", "Road record / home record", "road", "home", None),
+    ("Record", "Last 10", "l10", "l10", None),
+    ("Record", "Streak", "streak", "streak", None),
+    ("Record", "Goal difference per game", "gd_pg", "gd_pg", "signed2"),
+    ("Scoring and goaltending", "Goals for per game", "gf_pg", "gf_pg", "2"),
+    ("Scoring and goaltending", "Goals against per game", "ga_pg", "ga_pg", "2"),
+    ("Scoring and goaltending", "Shots for per game", "sf_pg", "sf_pg", "1"),
+    ("Scoring and goaltending", "Shots for per game, on the road / at home", "sf_pg_road", "sf_pg_home", "1"),
+    ("Scoring and goaltending", "Shots against per game", "sa_pg", "sa_pg", "1"),
+    ("Scoring and goaltending", "Shots against per game, on the road / at home", "sa_pg_road", "sa_pg_home", "1"),
+    ("Scoring and goaltending", "Shooting %", "sh_pct", "sh_pct", "pct1"),
+    ("Scoring and goaltending", "Save %", "sv_pct", "sv_pct", "pct3"),
+    ("Scoring and goaltending", "Save %, on the road / at home", "sv_pct_road", "sv_pct_home", "pct3"),
+    ("Scoring and goaltending", "PDO (shooting % + save %)", "pdo", "pdo", "pdo"),
+    ("Possession and chances (5-on-5)", "Shot-attempt share (Corsi)", "corsi", "corsi", "pct1"),
+    ("Possession and chances (5-on-5)", "Scoring-chance share", "chance_share", "chance_share", "pct1"),
+    ("Possession and chances (5-on-5)", "Scoring chances for per 60", "cf60", "cf60", "1"),
+    ("Possession and chances (5-on-5)", "Scoring chances against per 60", "ca60", "ca60", "1"),
+    ("Possession and chances (5-on-5)", "Offensive-zone minutes per 60", "oz_min60", "oz_min60", "1"),
+    ("Possession and chances (5-on-5)", "BER (breakout efficiency rating)", "ber", "ber", "1"),
+    ("Possession and chances (5-on-5)", "BEI (breakout efficiency index)", "bei", "bei", "1"),
+    ("Special teams", "Power play %", "pp_pct", "pp_pct", "pct1"),
+    ("Special teams", "Penalty kill %", "pk_pct", "pk_pct", "pct1"),
+    ("Special teams", "Power kill (PP% + PK%)", "power_kill", "power_kill", "1"),
+    ("Contender fit", "Final-four chance (contender fit)", "fit", "fit", "fitpct"),
+]
+
+
+def read_profiles():
+    """The team profiles and this season's game list (from build_matchups.py), or (None, None, None) if they are not built yet."""
+    if not PROFILES_FILE.exists():
+        return None, None, None
+    note = str(pd.read_excel(PROFILES_FILE, sheet_name="Teams", header=None, nrows=1).iloc[0, 0])
+    teams = pd.read_excel(PROFILES_FILE, sheet_name="Teams", header=1)
+    teams["record"] = teams["w"].astype(int).astype(str) + "-" + teams["l"].astype(int).astype(str) + "-" + teams["otl"].astype(int).astype(str)
+    games = pd.read_excel(PROFILES_FILE, sheet_name="Games")
+    return teams.set_index("team"), games, note
+
+
+def fmt_matchup(value, kind):
+    if pd.isna(value):
+        return "-"
+    if kind is None:
+        return str(value)
+    v = float(value)
+    return {"pct3": fmt_pct(v), "pct1": f"{v:.1%}", "signed2": f"{v:+.2f}", "2": f"{v:.2f}", "1": f"{v:.1f}",
+            "pdo": f"{v * 100:.1f}", "fitpct": f"{v:.1f}%"}[kind]
+
+
+def short_date(text):
+    d = datetime.strptime(str(text)[:10], "%Y-%m-%d")
+    return f"{d:%b} {d.day}"
+
+
+def form_list(games, team, n=5):
+    rows = games[games["Team"] == team].head(n)
+    if rows.empty:
+        return "<li>No games yet.</li>"
+    return "".join(f'<li><span class="res res-{esc(r["Result"].split()[0].lower())}">{esc(r["Result"])}</span> {esc(r["Score"])} '
+                   f'{"vs" if r["Home or road"] == "H" else "at"} {esc(r["Opponent"])} <span class="note">&middot; {short_date(r["Date"])}</span></li>'
+                   for _, r in rows.iterrows())
+
+
+def matchup_panel(g, teams, games, through):
+    away, home = g["away"], g["home"]
+    if away not in teams.index or home not in teams.index:
+        return ""
+    a, h = teams.loc[away], teams.loc[home]
+    rows, section = [], None
+    for sec, label, a_col, h_col, kind in MATCHUP_ROWS:
+        if a_col not in teams.columns or h_col not in teams.columns:
+            continue
+        if sec != section:
+            rows.append(f'<tr class="section"><td colspan="3">{esc(sec)}</td></tr>')
+            section = sec
+        cells = []
+        a_rank = a.get(f"rank_{a_col}") if kind else None
+        h_rank = h.get(f"rank_{h_col}") if kind else None
+        better = None
+        if a_rank is not None and h_rank is not None and pd.notna(a_rank) and pd.notna(h_rank) and a_rank != h_rank:
+            better = "away" if a_rank < h_rank else "home"
+        for side, team, col, rank in (("away", a, a_col, a_rank), ("home", h, h_col, h_rank)):
+            rank_text = f' <span class="rk">#{int(rank)}</span>' if rank is not None and pd.notna(rank) else ""
+            cls = ' class="better"' if better == side else ""
+            cells.append(f"<td{cls}>{esc(fmt_matchup(team.get(col), kind))}{rank_text}</td>")
+        rows.append(f'<tr><td class="left">{esc(label)}</td>{"".join(cells)}</tr>')
+    meetings = games[(games["Team"] == away) & (games["Opponent"] == home)]
+    series = ("".join(f'<li>{short_date(r["Date"])}: {esc(away)} <span class="res res-{esc(r["Result"].split()[0].lower())}">{esc(r["Result"])}</span> {esc(r["Score"])} '
+                      f'{"at" if r["Home or road"] == "R" else "vs"} {esc(home)}</li>' for _, r in meetings.iterrows())
+              or "<li>First meeting this season.</li>")
+    return f"""
+<div class="match-panel" id="m-{esc(g['game_id'])}">
+  <h3>{esc(away)} at {esc(home)}</h3>
+  <p class="note">The season so far, games through {esc(through)}. "#" is the league rank (1 = best); the better team in each row is highlighted.
+  These are season numbers, not a prediction of tonight's game.</p>
+  <div class="table-wrap"><table class="match">
+    <thead><tr><th class="left">Stat</th><th>{esc(away)} (away)</th><th>{esc(home)} (home)</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
+  </table></div>
+  <div class="match-forms">
+    <div><h4>{esc(away)}: last 5</h4><ul>{form_list(games, away)}</ul></div>
+    <div><h4>{esc(home)}: last 5</h4><ul>{form_list(games, home)}</ul></div>
+    <div><h4>Season series</h4><ul>{series}</ul></div>
+  </div>
+</div>"""
 
 
 # ----------------------------------------------------------------------------
@@ -228,7 +350,7 @@ def standings_section(standings):
 def home_page(schedule, standings, built_text):
     body = f"""
 <h1>{esc(SITE_NAME)}</h1>
-{games_section(schedule, standings)}
+{games_section(schedule, standings, read_profiles())}
 {standings_section(standings)}
 """
     return page(SITE_NAME, "home", body, built_text)

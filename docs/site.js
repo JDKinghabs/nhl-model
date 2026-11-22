@@ -77,6 +77,32 @@
     row.addEventListener('click', toggle);                        // clicking anywhere on the row works too
   });
 
+  // 5) Game cards on the home page that open a matchup panel under tonight's games. One at a time; clicking anywhere on
+  // the card works, and clicking an open card closes it. Without this script every panel simply stays visible.
+  var gameButtons = document.querySelectorAll('button.game-toggle');
+  if (gameButtons.length) document.documentElement.classList.add('js');
+  gameButtons.forEach(function (button) { setPanel(document.getElementById(button.getAttribute('data-panel')), false); });
+  gameButtons.forEach(function (button) {
+    var card = button.closest('.game');
+    function toggle() {
+      var panel = document.getElementById(button.getAttribute('data-panel'));
+      var wasOpen = button.getAttribute('aria-expanded') === 'true';
+      gameButtons.forEach(function (other) {
+        other.setAttribute('aria-expanded', 'false');
+        other.closest('.game').classList.remove('open');
+        setPanel(document.getElementById(other.getAttribute('data-panel')), false);
+      });
+      if (!wasOpen && panel) {
+        button.setAttribute('aria-expanded', 'true');
+        card.classList.add('open');
+        setPanel(panel, true);
+        if (panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+    button.addEventListener('click', function (event) { event.stopPropagation(); toggle(); });
+    card.addEventListener('click', toggle);
+  });
+
   // 3) Filter buttons (All / Eastern / Western) above a table.
   document.querySelectorAll('[data-filter-group]').forEach(function (group) {
     var table = document.getElementById(group.getAttribute('data-filter-group'));

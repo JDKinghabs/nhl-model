@@ -59,7 +59,7 @@ Then commit and push the changed files in `docs/`. The pages show summary result
 
 Every morning at 6:00 AM, Windows Task Scheduler runs `scripts/daily_update.py` on this computer. It refreshes
 tonight's games and the standings, this season's game results, the contender fit and the Breakouts tables for
-this season (BER and BEI), the Zone time and chances tables, rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
+this season (BER and BEI), the Zone time and chances tables, the matchup panels under tonight's games, rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
 minutes and needs nothing from you.
 
 - **Safety rules.** If any step fails it stops and publishes nothing. It does not run at all if the project has unsaved
@@ -226,6 +226,16 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     ```
     The workbook is `outputs/zone_chances.xlsx`: start with its "Verdict" sheet. The first run reads every season's
     play-by-play (a few minutes) and saves copies in `data/zone/`.
+
+16. Matchup panels: on the home page, clicking a game opens a side-by-side comparison of the two teams for the
+    season so far (record, goals and shots, shooting % and save % overall and at home or on the road, shot-attempt
+    share, scoring chances, BER, BEI, special teams, contender fit, the last 5 games and the season series), each
+    with its league rank. It shows the season so far only: no projections for tonight's game.
+    ```
+    python scripts/build_matchups.py
+    python scripts/build_site.py
+    ```
+    The team profiles are in `outputs/team_profiles.xlsx`.
 
 ## The play-by-play download (overnight)
 
