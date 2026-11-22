@@ -112,14 +112,17 @@ def main():
     if fit is not None:
         t = t.merge(fit.rename(columns={"Team": "team_name", "Final-four chance (model)": "fit"})[["team_name", "fit"]], on="team_name", how="left")
 
-    goal = read_optional(OUTPUTS / "goaltending_in_context.xlsx", "Right now")
+    # goaltending and defense: our own expected-goals model (updated daily) if it has been built, otherwise the MoneyPuck-based study
+    xg_file = OUTPUTS / "expected_goals.xlsx"
+    goal_file, goalie_source = (xg_file, "our expected-goals model") if xg_file.exists() else (OUTPUTS / "goaltending_in_context.xlsx", "MoneyPuck data")
+    goal = read_optional(goal_file, "Right now")
     goalie_through = ""
     if goal is not None:
         t = t.merge(goal.rename(columns={"Team": "team_name", "GSAx (goals)": "gsax", "Defense rank (1 = best)": "defense_rank",
                                          "Goaltending rank (1 = best)": "goalie_rank", "Label": "goalie_label"})[
             ["team_name", "gsax", "defense_rank", "goalie_rank", "goalie_label"]], on="team_name", how="left")
         t["rank_defense_rank"], t["rank_goalie_rank"] = t["defense_rank"], t["goalie_rank"]       # these two are ranks already
-        note = str(pd.read_excel(OUTPUTS / "goaltending_in_context.xlsx", sheet_name="Right now", header=None, nrows=1).iloc[0, 0])
+        note = str(pd.read_excel(goal_file, sheet_name="Right now", header=None, nrows=1).iloc[0, 0])
         found = re.search(r"games through (\d{4}-\d{2}-\d{2})", note)
         goalie_through = found.group(1) if found else ""
 
@@ -160,7 +163,8 @@ def main():
                 writer, sheet_name="Teams", index=False, header=False)
             out.round(4).to_excel(writer, sheet_name="Teams", index=False, startrow=1)
             games.to_excel(writer, sheet_name="Games", index=False)
-            pd.DataFrame({"Item": ["games_through", "goalie_through"], "Value": [through, goalie_through]}).to_excel(writer, sheet_name="Notes", index=False)
+            pd.DataFrame({"Item": ["games_through", "goalie_through", "goalie_source"], "Value": [through, goalie_through, goalie_source if goal is not None else ""]}).to_excel(
+                writer, sheet_name="Notes", index=False)
     except PermissionError:
         print(f"Could not save {OUTPUT_FILE.name}. Is it open in Excel? Close it and run again.")
         return 1

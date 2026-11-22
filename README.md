@@ -59,7 +59,7 @@ Then commit and push the changed files in `docs/`. The pages show summary result
 
 Every morning at 6:00 AM, Windows Task Scheduler runs `scripts/daily_update.py` on this computer. It refreshes
 tonight's games and the standings, this season's game results, the contender fit and the Breakouts tables for
-this season (BER and BEI), the Zone time and chances tables, the matchup panels under tonight's games, rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
+this season (BER and BEI), the Zone time and chances tables, the matchup panels under tonight's games (with our own expected goals), rebuilds the pages, then commits the `docs/` folder and pushes it, which publishes the site. It takes a few
 minutes and needs nothing from you.
 
 - **Safety rules.** If any step fails it stops and publishes nothing. It does not run at all if the project has unsaved
@@ -236,6 +236,16 @@ The `data/` folder is **not stored on GitHub** (it is listed in `.gitignore`). T
     python scripts/build_site.py
     ```
     The team profiles are in `outputs/team_profiles.xlsx`.
+
+17. Our own expected-goals model: every unblocked shot gets a chance of becoming a goal from its distance and angle,
+    shot type, rebound, rush and strength (a logistic regression on the NHL play-by-play, fitted on the seasons since
+    2021-22 because it did better on two held-back seasons than fitting on every season). From it come goals saved above
+    expected (GSAx), the defense rank and the goaltending rank, updated every morning. They are used in the matchup panels
+    and the Goaltending page's "Right now" list; the Goaltending study's history keeps using MoneyPuck's numbers.
+    ```
+    python scripts/build_xg.py
+    ```
+    The workbook is `outputs/expected_goals.xlsx` ("Check" and "Agreement with MoneyPuck" show how good it is).
 
 ## The play-by-play download (overnight)
 

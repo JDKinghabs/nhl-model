@@ -71,6 +71,7 @@ STEPS = [  # (script, plain name)
     ("pull_edge_zone_time.py", "this season's NHL EDGE zone time"),
     ("build_breakout_bei.py", "the breakout efficiency index (BEI)"),
     ("build_zone_chances.py", "zone time and scoring chances"),
+    ("build_xg.py", "our expected-goals model (GSAx and defense)"),
     ("build_matchups.py", "team profiles for the matchup panels"),
     ("build_site.py", "rebuild the web pages"),
 ]

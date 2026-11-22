@@ -212,6 +212,7 @@ def read_profiles():
     except ValueError:
         notes = {}
     teams.attrs["goalie_through"] = str(notes.get("goalie_through") or "")
+    teams.attrs["goalie_source"] = str(notes.get("goalie_source") or "MoneyPuck data")
     return teams.set_index("team"), games, note
 
 
@@ -251,7 +252,7 @@ def matchup_panel(g, teams, games, through):
         if sec != section:
             heading = sec
             if sec == "Goaltending and defense" and teams.attrs.get("goalie_through"):
-                heading = f"{sec} (MoneyPuck data, games through {short_date(teams.attrs['goalie_through'])})"
+                heading = f"{sec} ({teams.attrs.get('goalie_source', 'MoneyPuck data')}, games through {short_date(teams.attrs['goalie_through'])})"
             rows.append(f'<tr class="section"><td colspan="3">{esc(heading)}</td></tr>')
             section = sec
         cells = []
@@ -715,6 +716,7 @@ Shot-quality data from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a
 RED_FILE = PROJECT_FOLDER / "outputs" / "red_flags.xlsx"
 SLOW_FILE = PROJECT_FOLDER / "outputs" / "slow_starters.xlsx"
 GOAL_FILE = PROJECT_FOLDER / "outputs" / "goaltending_in_context.xlsx"
+XG_FILE = PROJECT_FOLDER / "outputs" / "expected_goals.xlsx"
 
 MONEYPUCK_NOTE = ('Shot-quality data on this page is from <a href="https://moneypuck.com/data.htm">MoneyPuck.com</a>, '
                   'used here for non-commercial purposes with credit.')
@@ -1020,8 +1022,10 @@ def goaltending_page(standings, built_text):
     follow = read_sheet(GOAL_FILE, "Labels after Jan 1")
     playoff = read_sheet(GOAL_FILE, "Playoff goaltending")
     hot = read_sheet(GOAL_FILE, "Hot goalies")
-    right = read_sheet(GOAL_FILE, "Right now", header=1)
-    note = read_note(GOAL_FILE)
+    # The "Right now" list uses this site's own expected-goals model (updated daily) once it has been built; the history uses MoneyPuck's
+    own_xg = XG_FILE.exists()
+    right = read_sheet(XG_FILE if own_xg else GOAL_FILE, "Right now", header=1)
+    note = read_note(XG_FILE if own_xg else GOAL_FILE)
 
     repeat_rows = [[r["Statistic"], r["Better when"], f"{r['Repeats (before vs after Jan 1)']:.2f}", str(r["Carry-over (share of the gap still there)"])]
                    for _, r in repeats.iterrows()]
@@ -1063,7 +1067,7 @@ Terms are explained on the <a href="about.html">About</a> page. {MONEYPUCK_NOTE}
 <h1>Goaltending in context</h1>
 <h2>Right now <span class="note">&middot; games through {esc(through_text(note))}</span></h2>
 <p class="note">Teams are labeled "both good", "goalie bailing out the defense", "defense let down by the goalie" or "both weak" by whether each part is above or below the league median.
-Early in a season these labels are noisy.</p>
+Early in a season these labels are noisy.{" This list uses this site's own expected-goals model, built from the NHL play-by-play and updated every morning; the history below uses MoneyPuck's." if own_xg else ""}</p>
 {team_table("goalie-table", right, cols, conference_map(standings), rank_tip="Rank on this list: by goaltending (goals saved above expected per 60), best first")}
 
 <h2>What we found</h2>
